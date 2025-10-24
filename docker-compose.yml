@@ -1,0 +1,65 @@
+# ============================================
+# FILE: docker-compose.yml
+# Local development environment
+# ============================================
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: fundraising_db
+    environment:
+      POSTGRES_USER: fundraising_user
+      POSTGRES_PASSWORD: fundraising_pass
+      POSTGRES_DB: fundraising_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fundraising_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../Dockerfile.backend
+    container_name: fundraising_backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: 5000
+      DATABASE_URL: postgresql://fundraising_user:fundraising_pass@postgres:5432/fundraising_db
+      JWT_SECRET: dev_jwt_secret_key_12345
+      JWT_EXPIRE: 7d
+      FRONTEND_URL: http://localhost:5173
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: npm run dev
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../Dockerfile.frontend
+    container_name: fundraising_frontend
+    depends_on:
+      - backend
+    environment:
+      VITE_API_BASE_URL: http://localhost:5000/api
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev
+
+volumes:
+  postgres_data:

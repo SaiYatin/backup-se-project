@@ -1,0 +1,59 @@
+# ==================================================
+# FILE: .github/workflows/pr-checks.yml
+# Pull Request Quality Checks
+# ==================================================
+---
+name: PR Quality Checks
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check commit messages
+        run: |
+          echo "Checking commit messages..."
+          # Add commitlint check here
+
+      - name: Check for merge conflicts
+        run: |
+          git diff --check
+
+      - name: Validate PR title
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment PR checklist
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const checklist = `
+            ## PR Checklist
+            - [ ] Code follows project style guidelines
+            - [ ] Tests added/updated for new features
+            - [ ] Documentation updated
+            - [ ] No breaking changes
+            - [ ] All CI checks passing
+            `;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: checklist
+            })
