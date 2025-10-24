@@ -2,10 +2,6 @@
 
 > A comprehensive web-based platform for creating fundraising events, accepting pledges, and tracking donation progress in real-time.
 
-[![Backend CI/CD](https://github.com/YOUR_USERNAME/fundraising-portal/workflows/Backend%20CI%2FCD/badge.svg)](https://github.com/YOUR_USERNAME/fundraising-portal/actions)
-[![Frontend CI/CD](https://github.com/YOUR_USERNAME/fundraising-portal/workflows/Frontend%20CI%2FCD/badge.svg)](https://github.com/YOUR_USERNAME/fundraising-portal/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
 ---
 
 ## 📋 Table of Contents
