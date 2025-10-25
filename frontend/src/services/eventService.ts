@@ -27,7 +27,8 @@ export interface CreateEventData {
 export const eventService = {
   async getAllEvents() {
     const response = await api.get('/events');
-    return response.data;
+    // Backend returns: { success: true, data: [...] }
+    return response.data.data || response.data; // Handle both formats
   },
 
   async getEventById(id: string) {
