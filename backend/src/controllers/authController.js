@@ -1,7 +1,49 @@
 const bcrypt = require('bcryptjs');
 const { generateToken } = require('../config/jwt');
-const storage = require('../config/database');
-const { v4: uuidv4 } = require('crypto');
+// ✅ CORRECT Implementation
+const User = require('../models/User');
+const { generateToken } = require('../config/jwt');
+
+exports.register = async (req, res, next) => {
+  try {
+    const { name, email, password, role } = req.body;
+
+    // Check if user exists
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email already registered'
+      });
+    }
+
+    // Create user (password hashing done by beforeCreate hook in model)
+    const user = await User.create({
+      name,
+      email,
+      password_hash: password, // Will be hashed by model hook
+      role: role || 'donor'
+    });
+
+    // Generate token
+    const token = generateToken({ 
+      id: user.id, 
+      email: user.email, 
+      role: user.role 
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully',
+      data: {
+        user: user.toJSON(), // Removes password_hash
+        token
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 // Register
 exports.register = async (req, res, next) => {
