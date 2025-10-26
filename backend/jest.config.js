@@ -9,6 +9,7 @@ module.exports = {
   testMatch: [
     '**/tests/**/*.test.js'
   ],
+    setupFiles: ['./src/tests/setup-env.js'],
   coverageThreshold: {
     global: {
       branches: 70,

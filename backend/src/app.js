@@ -36,13 +36,12 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // Rate limiting
-// ✅ Enhance rate limiter
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
   message: 'Too many requests',
-  standardHeaders: true, // Add this
-  legacyHeaders: false,  // Add this
+  standardHeaders: true,
+  legacyHeaders: false,
   handler: (req, res) => {
     logger.warn('Rate limit exceeded', {
       ip: req.ip,
@@ -74,7 +73,6 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/reports', reportRoutes);
 
 // 404 handler
-// ✅ Better 404 handler
 app.use('*', (req, res) => {
   logger.warn('404 Not Found', {
     method: req.method,
@@ -90,48 +88,41 @@ app.use('*', (req, res) => {
       // Health
       'GET /api/health',
 
-      // Auth
+      // Auth Routes
       'POST /api/auth/register',
       'POST /api/auth/login',
-      'POST /api/auth/logout',
-      'GET  /api/auth/me',
-      'POST /api/auth/refresh-token',
-      'POST /api/auth/forgot-password',
-      'POST /api/auth/reset-password',
-      'GET  /api/auth/verify-email',
+      'GET  /api/auth/profile',
+      'PUT  /api/auth/profile',
 
-      // Events
+      // Event Routes
       'GET    /api/events',
-      'POST   /api/events',
       'GET    /api/events/:id',
-      'PUT    /api/events/:id',
-      'DELETE /api/events/:id',
-      'GET    /api/events/:id/pledges',
-      'GET    /api/events/categories',
-      'GET    /api/events/search',
+      'POST   /api/events (organizer)',
+      'GET    /api/events/my/events (organizer)',
+      'PUT    /api/events/:id (organizer)',
+      'DELETE /api/events/:id (organizer)',
 
-      // Pledges
+      // Pledge Routes
       'POST   /api/pledges',
       'GET    /api/pledges',
+      'GET    /api/pledges/my',
+      'GET    /api/pledges/my-events (organizer)',
       'GET    /api/pledges/:id',
-      'PUT    /api/pledges/:id',
-      'DELETE /api/pledges/:id',
+      'PUT    /api/pledges/:id/status (organizer)',
 
-      // Admin
-      'GET    /api/admin/users',
-      'GET    /api/admin/users/:id',
-      'PUT    /api/admin/users/:id',
-      'DELETE /api/admin/users/:id',
+      // Admin Routes
       'GET    /api/admin/events',
-      'PUT    /api/admin/events/:id',
-      'DELETE /api/admin/events/:id',
-      'GET    /api/admin/stats',
+      'GET    /api/admin/pledges',
+      'GET    /api/admin/events/flagged',
+      'PUT    /api/admin/events/:id/approve',
+      'PUT    /api/admin/events/:id/reject',
+      'PUT    /api/admin/events/:id/flag',
 
-      // Reports
-      'GET /api/reports/donations',
-      'GET /api/reports/events',
-      'GET /api/reports/users',
-      'GET /api/reports/monthly'
+      // Report Routes
+      'GET /api/reports/admin/dashboard (admin)',
+      'GET /api/reports/organizer/summary (organizer)',
+      'GET /api/reports/event/:id/analytics',
+      'GET /api/reports/donor/activity'
     ]
   });
 });

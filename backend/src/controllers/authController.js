@@ -1,9 +1,8 @@
+const { User } = require('../models');
 const bcrypt = require('bcryptjs');
 const { generateToken } = require('../config/jwt');
-// ✅ CORRECT Implementation
-const User = require('../models/User');
-const { generateToken } = require('../config/jwt');
 
+// Register
 exports.register = async (req, res, next) => {
   try {
     const { name, email, password, role } = req.body;
@@ -45,62 +44,13 @@ exports.register = async (req, res, next) => {
   }
 };
 
-// Register
-exports.register = async (req, res, next) => {
-  try {
-    const { name, email, password, role } = req.body;
-
-    // Check if user exists
-    const existingUser = storage.users.find(u => u.email === email);
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email already registered'
-      });
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create user
-    const user = {
-      id: uuidv4(),
-      name,
-      email,
-      password: hashedPassword,
-      role: role || 'donor',
-      createdAt: new Date().toISOString()
-    };
-
-    storage.users.push(user);
-
-    // Generate token
-    const token = generateToken({ id: user.id, email: user.email, role: user.role });
-
-    // Remove password from response
-    const userResponse = { ...user };
-    delete userResponse.password;
-
-    res.status(201).json({
-      success: true,
-      message: 'User registered successfully',
-      data: {
-        user: userResponse,
-        token
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 // Login
 exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    // Find user
-    const user = storage.users.find(u => u.email === email);
+    // Find user using Sequelize
+    const user = await User.findOne({ where: { email } });
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -108,8 +58,8 @@ exports.login = async (req, res, next) => {
       });
     }
 
-    // Check password
-    const isMatch = await bcrypt.compare(password, user.password);
+    // Check password (assuming you have a comparePassword method in your User model)
+    const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(401).json({
         success: false,
@@ -118,17 +68,17 @@ exports.login = async (req, res, next) => {
     }
 
     // Generate token
-    const token = generateToken({ id: user.id, email: user.email, role: user.role });
-
-    // Remove password from response
-    const userResponse = { ...user };
-    delete userResponse.password;
+    const token = generateToken({ 
+      id: user.id, 
+      email: user.email, 
+      role: user.role 
+    });
 
     res.json({
       success: true,
       message: 'Login successful',
       data: {
-        user: userResponse,
+        user: user.toJSON(), // Removes password_hash automatically
         token
       }
     });
@@ -140,12 +90,64 @@ exports.login = async (req, res, next) => {
 // Get Profile
 exports.getProfile = async (req, res, next) => {
   try {
-    const userResponse = { ...req.user };
-    delete userResponse.password;
+    // req.user comes from auth middleware
+    // Fetch fresh user data from database
+    const user = await User.findByPk(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
 
     res.json({
       success: true,
-      data: userResponse
+      data: user.toJSON() // Removes password_hash
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update Profile
+exports.updateProfile = async (req, res, next) => {
+  try {
+    const { name, email, password } = req.body;
+
+    // Find user
+    const user = await User.findByPk(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Check if email is being changed and if it's already taken
+    if (email && email !== user.email) {
+      const existingUser = await User.findOne({ where: { email } });
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          error: 'Email already in use'
+        });
+      }
+    }
+
+    // Update fields
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (email) updateData.email = email;
+    if (password) updateData.password_hash = password; // Will be hashed by model hook
+
+    await user.update(updateData);
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: user.toJSON()
     });
   } catch (error) {
     next(error);
