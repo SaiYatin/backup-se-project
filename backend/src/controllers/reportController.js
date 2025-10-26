@@ -337,3 +337,633 @@ exports.getDonorActivity = async (req, res, next) => {
     next(error);
   }
 };
+
+const reportService = require('../services/reportService');
+const aggregationService = require('../services/aggregationService');
+const logger = require('../utils/logger');
+const { validationResult } = require('express-validator');
+
+/**
+ * Report Controller
+ * Handles all report-related endpoints with proper role-based access control
+ */
+
+/**
+ * Generate a daily report
+ * @route POST /api/reports/daily
+ * @access Admin only
+ */
+const generateDailyReport = async (req, res) => {
+  try {
+    // Validate request
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
+    const { date } = req.body;
+    const reportDate = date ? new Date(date) : new Date();
+    
+    // Validate date
+    if (isNaN(reportDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid date format'
+      });
+    }
+
+    const report = await reportService.generateDailyReport(reportDate, req.user.id);
+
+    res.status(201).json({
+      success: true,
+      message: 'Daily report generated successfully',
+      data: {
+        id: report.id,
+        type: report.type,
+        title: report.title,
+        status: report.status,
+        created_at: report.created_at,
+        data: report.data
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error in generateDailyReport controller:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to generate daily report'
+    });
+  }
+};
+
+/**
+ * Generate a weekly report
+ * @route POST /api/reports/weekly
+ * @access Admin only
+ */
+const generateWeeklyReport = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
+    const { start_date } = req.body;
+    const startDate = start_date ? new Date(start_date) : new Date();
+    
+    if (isNaN(startDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid start date format'
+      });
+    }
+
+    const report = await reportService.generateWeeklyReport(startDate, req.user.id);
+
+    res.status(201).json({
+      success: true,
+      message: 'Weekly report generated successfully',
+      data: {
+        id: report.id,
+        type: report.type,
+        title: report.title,
+        status: report.status,
+        created_at: report.created_at,
+        data: report.data
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error in generateWeeklyReport controller:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to generate weekly report'
+    });
+  }
+};
+
+/**
+ * Generate a monthly report
+ * @route POST /api/reports/monthly
+ * @access Admin only
+ */
+const generateMonthlyReport = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
+    const { year, month } = req.body;
+    const currentDate = new Date();
+    const reportYear = year || currentDate.getFullYear();
+    const reportMonth = month || currentDate.getMonth() + 1;
+
+    // Validate year and month
+    if (reportYear < 2020 || reportYear > currentDate.getFullYear() + 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid year'
+      });
+    }
+
+    if (reportMonth < 1 || reportMonth > 12) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid month (must be 1-12)'
+      });
+    }
+
+    const report = await reportService.generateMonthlyReport(reportYear, reportMonth, req.user.id);
+
+    res.status(201).json({
+      success: true,
+      message: 'Monthly report generated successfully',
+      data: {
+        id: report.id,
+        type: report.type,
+        title: report.title,
+        status: report.status,
+        created_at: report.created_at,
+        data: report.data
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error in generateMonthlyReport controller:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to generate monthly report'
+    });
+  }
+};
+
+/**
+ * Generate an event-specific report
+ * @route POST /api/reports/event/:eventId
+ * @access Admin, or Organizer (for their own events)
+ */
+const generateEventReport = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    if (!eventId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Event ID is required'
+      });
+    }
+
+    // TODO: Add authorization check for organizers to only access their own events
+    const report = await reportService.generateEventReport(eventId, req.user.id);
+
+    res.status(201).json({
+      success: true,
+      message: 'Event report generated successfully',
+      data: {
+        id: report.id,
+        type: report.type,
+        title: report.title,
+        status: report.status,
+        created_at: report.created_at,
+        data: report.data
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error in generateEventReport controller:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to generate event report'
+    });
+  }
+};
+
+/**
+ * Get all reports with filtering
+ * @route GET /api/reports
+ * @access Admin only
+ */
+const getReports = async (req, res) => {
+  try {
+    const {
+      type,
+      status,
+      limit = 20,
+      offset = 0,
+      start_date,
+      end_date
+    } = req.query;
+
+    const filters = {
+      type,
+      status,
+      limit: Math.min(parseInt(limit), 100), // Max 100 records
+      offset: parseInt(offset),
+      startDate: start_date,
+      endDate: end_date
+    };
+
+    // Remove undefined values
+    Object.keys(filters).forEach(key => {
+      if (filters[key] === undefined || filters[key] === '') {
+        delete filters[key];
+      }
+    });
+
+    const reports = await reportService.getReports(filters);
+
+    res.json({
+      success: true,
+      message: 'Reports retrieved successfully',
+      data: reports,
+      pagination: {
+        limit: filters.limit,
+        offset: filters.offset,
+        total: reports.length
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error in getReports controller:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to retrieve reports'
+    });
+  }
+};
+
+/**
+ * Get a specific report by ID
+ * @route GET /api/reports/:reportId
+ * @access Admin only
+ */
+const getReportById = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+
+    const Report = require('../models/Report');
+    const report = await Report.findByPk(reportId);
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: 'Report not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Report retrieved successfully',
+      data: report
+    });
+
+  } catch (error) {
+    logger.error('Error in getReportById controller:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to retrieve report'
+    });
+  }
+};
+
+/**
+ * Get platform overview (dashboard stats)
+ * @route GET /api/reports/overview
+ * @access Admin only
+ */
+const getPlatformOverview = async (req, res) => {
+  try {
+    const overview = await aggregationService.getPlatformOverview();
+
+    res.json({
+      success: true,
+      message: 'Platform overview retrieved successfully',
+      data: overview
+    });
+
+  } catch (error) {
+    logger.error('Error in getPlatformOverview controller:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to retrieve platform overview'
+    });
+  }
+};
+
+/**
+ * Get top performers data
+ * @route GET /api/reports/top-performers
+ * @access Admin only
+ */
+const getTopPerformers = async (req, res) => {
+  try {
+    const { period = 30 } = req.query;
+    const periodDays = Math.min(parseInt(period), 365); // Max 1 year
+
+    const topPerformers = await aggregationService.getTopPerformers(periodDays);
+
+    res.json({
+      success: true,
+      message: 'Top performers data retrieved successfully',
+      data: topPerformers
+    });
+
+  } catch (error) {
+    logger.error('Error in getTopPerformers controller:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to retrieve top performers data'
+    });
+  }
+};
+
+/**
+ * Get category analysis
+ * @route GET /api/reports/category-analysis
+ * @access Admin only
+ */
+const getCategoryAnalysis = async (req, res) => {
+  try {
+    const categoryAnalysis = await aggregationService.getCategoryAnalysis();
+
+    res.json({
+      success: true,
+      message: 'Category analysis retrieved successfully',
+      data: categoryAnalysis
+    });
+
+  } catch (error) {
+    logger.error('Error in getCategoryAnalysis controller:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to retrieve category analysis'
+    });
+  }
+};
+
+/**
+ * Get event statistics for a specific event
+ * @route GET /api/reports/events/:eventId/stats
+ * @access Admin, or Organizer (for their own events)
+ */
+const getEventStats = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { includeDetails = false } = req.query;
+
+    if (!eventId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Event ID is required'
+      });
+    }
+
+    const eventStats = await aggregationService.getEventStats(eventId, includeDetails === 'true');
+
+    res.json({
+      success: true,
+      message: 'Event statistics retrieved successfully',
+      data: eventStats
+    });
+
+  } catch (error) {
+    logger.error('Error in getEventStats controller:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to retrieve event statistics'
+    });
+  }
+};
+
+/**
+ * Download report as JSON
+ * @route GET /api/reports/:reportId/download
+ * @access Admin only
+ */
+const downloadReport = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+
+    const Report = require('../models/Report');
+    const report = await Report.findByPk(reportId);
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: 'Report not found'
+      });
+    }
+
+    const filename = `${report.type}-report-${report.start_date.toISOString().split('T')[0]}.json`;
+
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.json(report.data);
+
+  } catch (error) {
+    logger.error('Error in downloadReport controller:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to download report'
+    });
+  }
+};
+
+/**
+ * Delete old reports (cleanup)
+ * @route DELETE /api/reports/cleanup
+ * @access Admin only
+ */
+const cleanupReports = async (req, res) => {
+  try {
+    const { days_old = 90 } = req.query;
+    const daysOld = Math.max(parseInt(days_old), 30); // Minimum 30 days
+
+    const deletedCount = await reportService.cleanupOldReports(daysOld);
+
+    res.json({
+      success: true,
+      message: `Successfully cleaned up ${deletedCount} old reports`,
+      data: { deletedCount, daysOld }
+    });
+
+  } catch (error) {
+    logger.error('Error in cleanupReports controller:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to cleanup reports'
+    });
+  }
+};
+
+/**
+ * Health check endpoint for monitoring
+ * @route GET /api/health or /api/reports/health
+ * @access Public
+ */
+const healthCheck = async (req, res) => {
+  try {
+    const startTime = Date.now();
+    
+    // Test database connectivity
+    const dbStatus = await testDatabaseConnection();
+    
+    // Test aggregation service
+    const aggregationStatus = await testAggregationService();
+    
+    // Test email service (optional)
+    const emailStatus = await testEmailService();
+    
+    const responseTime = Date.now() - startTime;
+    
+    const healthData = {
+      success: true,
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      response_time_ms: responseTime,
+      version: process.env.npm_package_version || '1.0.0',
+      environment: process.env.NODE_ENV || 'development',
+      services: {
+        database: dbStatus,
+        aggregation: aggregationStatus,
+        email: emailStatus
+      },
+      system: {
+        memory: process.memoryUsage(),
+        platform: process.platform,
+        node_version: process.version
+      }
+    };
+
+    // Determine overall health status
+    const allServicesHealthy = Object.values(healthData.services).every(
+      service => service.status === 'healthy'
+    );
+
+    if (!allServicesHealthy) {
+      healthData.status = 'degraded';
+      return res.status(503).json(healthData);
+    }
+
+    res.json(healthData);
+
+  } catch (error) {
+    logger.error('Health check failed:', error);
+    res.status(503).json({
+      success: false,
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      uptime: process.uptime()
+    });
+  }
+};
+
+/**
+ * Test database connection
+ */
+const testDatabaseConnection = async () => {
+  try {
+    await sequelize.authenticate();
+    
+    // Test a simple query
+    const userCount = await User.count();
+    
+    return {
+      status: 'healthy',
+      message: 'Database connection successful',
+      response_time_ms: Date.now() - Date.now(),
+      total_users: userCount
+    };
+  } catch (error) {
+    return {
+      status: 'unhealthy',
+      message: 'Database connection failed',
+      error: error.message
+    };
+  }
+};
+
+/**
+ * Test aggregation service
+ */
+const testAggregationService = async () => {
+  try {
+    // Test basic aggregation functionality
+    const overview = await aggregationService.getPlatformOverview();
+    
+    return {
+      status: 'healthy',
+      message: 'Aggregation service operational',
+      sample_data: {
+        total_events: overview.totalEvents || 0,
+        total_users: overview.totalUsers || 0
+      }
+    };
+  } catch (error) {
+    return {
+      status: 'unhealthy',
+      message: 'Aggregation service failed',
+      error: error.message
+    };
+  }
+};
+
+/**
+ * Test email service (basic check)
+ */
+const testEmailService = async () => {
+  try {
+    // This is a basic check - just verify the service is importable
+    // In production, you might want to send a test email
+    const emailService = require('../services/emailService');
+    
+    return {
+      status: 'healthy',
+      message: 'Email service loaded successfully'
+    };
+  } catch (error) {
+    return {
+      status: 'unhealthy',
+      message: 'Email service unavailable',
+      error: error.message
+    };
+  }
+};
+
+module.exports = {
+  generateDailyReport,
+  generateWeeklyReport,
+  generateMonthlyReport,
+  generateEventReport,
+  getReports,
+  getReportById,
+  getPlatformOverview,
+  getTopPerformers,
+  getCategoryAnalysis,
+  getEventStats,
+  downloadReport,
+  cleanupReports,
+  healthCheck,
+  
+  // Legacy exports for backward compatibility
+  getAdminDashboard: exports.getAdminDashboard,
+  getOrganizerSummary: exports.getOrganizerSummary,
+  getEventAnalytics: exports.getEventAnalytics,
+  getDonorActivity: exports.getDonorActivity
+};
+

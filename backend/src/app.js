@@ -55,14 +55,68 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Server is healthy',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
-  });
+// Enhanced health check endpoint with database connectivity
+app.get('/api/health', async (req, res) => {
+  try {
+    const startTime = Date.now();
+    
+    // Test database connection
+    const { sequelize } = require('./config/database');
+    let dbStatus = 'healthy';
+    let dbError = null;
+    let dbResponseTime = 0;
+    
+    try {
+      const dbStart = Date.now();
+      await sequelize.authenticate();
+      dbResponseTime = Date.now() - dbStart;
+    } catch (error) {
+      dbStatus = 'unhealthy';
+      dbError = error.message;
+      logger.error('Database health check failed:', error);
+    }
+    
+    const totalResponseTime = Date.now() - startTime;
+    
+    const healthData = {
+      success: true,
+      status: dbStatus === 'healthy' ? 'healthy' : 'degraded',
+      message: 'Server health check',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      uptime: process.uptime(),
+      response_time_ms: totalResponseTime,
+      version: process.env.npm_package_version || '1.0.0',
+      services: {
+        database: {
+          status: dbStatus,
+          response_time_ms: dbResponseTime,
+          error: dbError
+        },
+        server: {
+          status: 'healthy',
+          memory_usage: process.memoryUsage(),
+          platform: process.platform,
+          node_version: process.version
+        }
+      }
+    };
+    
+    // Return appropriate status code
+    const statusCode = dbStatus === 'healthy' ? 200 : 503;
+    res.status(statusCode).json(healthData);
+    
+  } catch (error) {
+    logger.error('Health check endpoint error:', error);
+    res.status(503).json({
+      success: false,
+      status: 'unhealthy',
+      message: 'Health check failed',
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      uptime: process.uptime()
+    });
+  }
 });
 
 // API routes
