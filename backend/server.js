@@ -2,6 +2,9 @@ const app = require('./src/app');
 const { sequelize } = require('./src/config/database');
 const logger = require('./src/utils/logger');
 
+// ✅ Import models to ensure relationships are loaded
+const { User, Event, Pledge } = require('./src/models');
+
 const PORT = process.env.PORT || 5000;
 
 // Database connection and server start
@@ -15,6 +18,7 @@ const startServer = async () => {
     if (process.env.NODE_ENV !== 'production') {
       await sequelize.sync({ alter: false });
       logger.info('✅ Database synchronized');
+      logger.info('✅ Models loaded: User, Event, Pledge');
     }
 
     // Start server

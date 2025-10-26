@@ -75,13 +75,21 @@ CREATE INDEX idx_pledges_created_at ON pledges(created_at DESC);
 -- ============================================
 CREATE TABLE reports (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    generated_by UUID NOT NULL REFERENCES users(id),
-    report_type VARCHAR(50) NOT NULL,
-    data JSONB NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    event_id UUID NOT NULL REFERENCES events(id),
+    reporter_id UUID NOT NULL REFERENCES users(id),
+    type VARCHAR(20) NOT NULL CHECK (type IN ('FRAUD', 'INAPPROPRIATE', 'SCAM', 'OTHER')),
+    description TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'INVESTIGATING', 'RESOLVED', 'DISMISSED')),
+    resolution_notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_reports_type ON reports(report_type);
+CREATE INDEX idx_reports_event ON reports(event_id);
+CREATE INDEX idx_reports_reporter ON reports(reporter_id);
+CREATE INDEX idx_reports_type ON reports(type);
+CREATE INDEX idx_reports_status ON reports(status);
+CREATE INDEX reports_event_id_status ON reports(event_id, status);
 CREATE INDEX idx_reports_created_at ON reports(created_at DESC);
 
 -- ============================================
@@ -263,12 +271,12 @@ INSERT INTO users (name, email, password_hash, role, is_verified) VALUES
 
 -- Function to clean old audit logs (keep only 1 year as per NFR-004)
 CREATE OR REPLACE FUNCTION cleanup_old_audit_logs()
-RETURNS void AS $
+RETURNS void AS $$
 BEGIN
     DELETE FROM audit_logs
     WHERE created_at < CURRENT_TIMESTAMP - INTERVAL '1 year';
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 -- Schedule cleanup (requires pg_cron extension in production)
 -- SELECT cron.schedule('cleanup-audit-logs', '0 0 * * 0', 'SELECT cleanup_old_audit_logs()');
