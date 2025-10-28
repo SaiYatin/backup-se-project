@@ -1,3 +1,6 @@
+// ✅ backend/src/middleware/validationMiddleware.js
+// SIMPLIFIED VERSION FOR DEVELOPMENT
+
 const Joi = require('joi');
 const logger = require('../utils/logger');
 
@@ -32,12 +35,12 @@ const schemas = {
   register: Joi.object({
     name: Joi.string().min(3).max(100).required(),
     email: Joi.string().email().required(),
+    // SIMPLIFIED: Just require 6+ characters for development
     password: Joi.string()
-      .min(8)
-      .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+      .min(6)
       .required()
       .messages({
-        'string.pattern.base': 'Password must contain uppercase, lowercase, number, and special character'
+        'string.min': 'Password must be at least 6 characters'
       }),
     role: Joi.string().valid('donor', 'organizer').default('donor')
   }),
@@ -65,3 +68,24 @@ const schemas = {
 };
 
 module.exports = { validate, schemas };
+
+// ===================================================================
+// PRODUCTION VERSION (comment out the above and use this instead)
+// ===================================================================
+/*
+const schemas = {
+  register: Joi.object({
+    name: Joi.string().min(3).max(100).required(),
+    email: Joi.string().email().required(),
+    password: Joi.string()
+      .min(8)
+      .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+      .required()
+      .messages({
+        'string.pattern.base': 'Password must contain uppercase, lowercase, number, and special character'
+      }),
+    role: Joi.string().valid('donor', 'organizer').default('donor')
+  }),
+  // ... rest of schemas
+};
+*/
