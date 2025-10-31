@@ -1,3 +1,5 @@
+import { fontFamily } from "tailwindcss/defaultTheme";
+import tailwindcssAnimate from "tailwindcss-animate";
 import type { Config } from "tailwindcss";
 
 export default {
@@ -83,22 +85,17 @@ export default {
         'smooth': 'var(--transition-smooth)',
         'bounce': 'var(--transition-bounce)',
       },
+      fontFamily: {
+        sans: ["var(--font-sans)", ...fontFamily.sans],
+      },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
         "fade-in": {
           from: {
@@ -127,5 +124,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [tailwindcssAnimate],
 } satisfies Config;
