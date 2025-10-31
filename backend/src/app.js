@@ -14,6 +14,7 @@ const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
 
 const app = express();
+require('dotenv').config();
 
 // Security middleware
 app.use(helmet());
