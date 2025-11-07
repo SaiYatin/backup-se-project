@@ -18,6 +18,7 @@ import NotFound from "./pages/NotFound";
 // NEW IMPORTS - Added by Nighthawk166
 import AdminDashboard from "./pages/AdminDashboard";
 import EditEvent from "./pages/EditEvent";
+import CreateEvent from "./pages/CreateEvent";
 import AdminReports from "./pages/AdminReports";
 
 const queryClient = new QueryClient();
@@ -59,6 +60,14 @@ const App = () => (
                 />
                 
                 {/* Protected Organizer Routes */}
+                <Route
+                  path="/events/new"
+                  element={
+                    <ProtectedRoute requiredRole="organizer">
+                      <CreateEvent />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route
                   path="/events/:id/edit"
                   element={

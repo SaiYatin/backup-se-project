@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -16,29 +15,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import {
   Form,
   FormControl,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { ArrowLeft, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { eventService, Event } from '@/services/eventService';
-import { useAuth } from '@/context/AuthContext';
+import { eventService } from '@/services/eventService';
 
 const eventSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters'),
@@ -62,14 +49,9 @@ const categories = [
   'Other',
 ];
 
-const EditEvent = () => {
-  const { id } = useParams<{ id: string }>();
+const CreateEvent = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [event, setEvent] = useState<Event | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const form = useForm<EventFormData>({
     resolver: zodResolver(eventSchema),
@@ -83,135 +65,53 @@ const EditEvent = () => {
     },
   });
 
-  useEffect(() => {
-    if (id) {
-      loadEvent();
-    }
-  }, [id]);
-
-  const loadEvent = async () => {
+  const onSubmit = async (data: EventFormData) => {
     try {
       setLoading(true);
-      const response = await eventService.getEventById(id!);
-      const eventData = response.data;
+      const response = await eventService.createEvent(data);
+      toast.success('Event created successfully! 🎉');
       
-      // Check if user owns this event
-      if (eventData.organizerId !== user?.id && user?.role !== 'admin') {
-        toast.error('You do not have permission to edit this event');
+      // Navigate to the newly created event
+      if (response.data?.id) {
+        navigate(`/events/${response.data.id}`);
+      } else {
         navigate('/dashboard');
-        return;
       }
-
-      setEvent(eventData);
-      
-      // Populate form
-      form.reset({
-        title: eventData.title,
-        description: eventData.description,
-        targetAmount: eventData.targetAmount,
-        category: eventData.category,
-        endDate: eventData.endDate.split('T')[0], // Format for date input
-        image: eventData.image || '',
-      });
     } catch (error: any) {
-      toast.error('Failed to load event');
-      navigate('/dashboard');
+      toast.error(error.response?.data?.error || 'Failed to create event');
     } finally {
       setLoading(false);
     }
   };
 
-  const onSubmit = async (data: EventFormData) => {
-    try {
-      setSaving(true);
-      await eventService.updateEvent(id!, data);
-      toast.success('Event updated successfully');
-      navigate(`/events/${id}`);
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to update event');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    try {
-      setDeleting(true);
-      await eventService.deleteEvent(id!);
-      toast.success('Event deleted successfully');
-      navigate('/dashboard');
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to delete event');
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  if (loading) {
-    return <LoadingSpinner fullScreen />;
-  }
-
-  if (!event) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-bold">Event not found</h2>
-          <Link to="/dashboard">
-            <Button variant="hero">Back to Dashboard</Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  // Set minimum date to today
+  const today = new Date().toISOString().split('T')[0];
 
   return (
     <div className="min-h-screen bg-gradient-subtle py-8">
       <div className="container mx-auto px-4">
         <div className="max-w-3xl mx-auto space-y-6">
           {/* Header */}
-          <div className="flex items-center justify-between">
-            <Link to={`/events/${id}`}>
-              <Button variant="ghost" className="gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Back to Event
-              </Button>
-            </Link>
-            
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" className="gap-2">
-                  <Trash2 className="h-4 w-4" />
-                  Delete Event
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete your
-                    event and all associated data.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    {deleting ? 'Deleting...' : 'Delete Event'}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+          <Link to="/dashboard">
+            <Button variant="ghost" className="gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </Button>
+          </Link>
+
+          <div className="text-center space-y-2">
+            <h1 className="text-4xl font-bold">Create New Event</h1>
+            <p className="text-lg text-muted-foreground">
+              Start your fundraising journey and make a difference
+            </p>
           </div>
 
-          {/* Edit Form */}
+          {/* Create Form */}
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle>Edit Event</CardTitle>
+              <CardTitle>Event Details</CardTitle>
               <CardDescription>
-                Update your event details. Changes will be visible immediately.
+                Provide information about your fundraising event. Be clear and specific to attract donors.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -222,10 +122,16 @@ const EditEvent = () => {
                     name="title"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Event Title</FormLabel>
+                        <FormLabel>Event Title *</FormLabel>
                         <FormControl>
-                          <Input placeholder="Amazing Fundraiser" {...field} />
+                          <Input 
+                            placeholder="Help Build a Community Center" 
+                            {...field} 
+                          />
                         </FormControl>
+                        <FormDescription>
+                          A clear, compelling title that describes your cause
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -236,14 +142,17 @@ const EditEvent = () => {
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Description</FormLabel>
+                        <FormLabel>Description *</FormLabel>
                         <FormControl>
                           <Textarea
-                            placeholder="Tell people about your cause..."
+                            placeholder="Tell your story... Why is this important? How will the funds be used?"
                             className="min-h-[150px]"
                             {...field}
                           />
                         </FormControl>
+                        <FormDescription>
+                          Share your story and explain how donations will make an impact
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -255,15 +164,18 @@ const EditEvent = () => {
                       name="targetAmount"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Target Amount ($)</FormLabel>
+                          <FormLabel>Target Amount ($) *</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
                               placeholder="5000"
                               {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                             />
                           </FormControl>
+                          <FormDescription>
+                            Your fundraising goal
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -274,7 +186,7 @@ const EditEvent = () => {
                       name="category"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Category</FormLabel>
+                          <FormLabel>Category *</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
@@ -289,6 +201,9 @@ const EditEvent = () => {
                               ))}
                             </SelectContent>
                           </Select>
+                          <FormDescription>
+                            Help donors find your cause
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -300,10 +215,17 @@ const EditEvent = () => {
                     name="endDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>End Date</FormLabel>
+                        <FormLabel>End Date *</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} />
+                          <Input 
+                            type="date" 
+                            min={today}
+                            {...field} 
+                          />
                         </FormControl>
+                        <FormDescription>
+                          When should this fundraiser end?
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -321,6 +243,9 @@ const EditEvent = () => {
                             {...field}
                           />
                         </FormControl>
+                        <FormDescription>
+                          Add a compelling image to attract donors
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -331,15 +256,17 @@ const EditEvent = () => {
                       type="submit"
                       variant="hero"
                       className="flex-1 gap-2"
-                      disabled={saving}
+                      size="lg"
+                      disabled={loading}
                     >
-                      <Save className="h-4 w-4" />
-                      {saving ? 'Saving...' : 'Save Changes'}
+                      <Plus className="h-4 w-4" />
+                      {loading ? 'Creating...' : 'Create Event'}
                     </Button>
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => navigate(`/events/${id}`)}
+                      size="lg"
+                      onClick={() => navigate('/dashboard')}
                     >
                       Cancel
                     </Button>
@@ -348,10 +275,24 @@ const EditEvent = () => {
               </Form>
             </CardContent>
           </Card>
+
+          {/* Tips Card */}
+          <Card className="bg-muted/50">
+            <CardHeader>
+              <CardTitle className="text-lg">Tips for Success</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>✨ Use a clear, specific title that explains your cause</p>
+              <p>📸 Add a high-quality image to make your event stand out</p>
+              <p>📝 Tell a compelling story in your description</p>
+              <p>🎯 Set a realistic funding goal</p>
+              <p>⏰ Give yourself enough time to reach your target</p>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
   );
 };
 
-export default EditEvent;
+export default CreateEvent;
