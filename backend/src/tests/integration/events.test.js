@@ -1,6 +1,6 @@
 // tests/events.test.js
 const request = require('supertest');
-const app = require('../app');
+const app = require('../../app');
 const { setupTestDatabase, cleanupTestDatabase, createTestUser, createTestEvent } = require('./setup');
 
 describe('Event Tests', () => {

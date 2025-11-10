@@ -1,6 +1,7 @@
 // tests/setup.js
-const { sequelize } = require('../config/database');
-const { User, Event, Pledge } = require('../models');
+const { sequelize } = require('../../config/database');
+const { User, Event, Pledge } = require('../../models');
+
 
 // Setup function to reset database before tests
 const setupTestDatabase = async () => {

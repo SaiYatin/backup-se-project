@@ -1,31 +1,27 @@
 const nodemailer = require('nodemailer');
 const logger = require('../utils/logger');
 
-const transporter = nodemailer.createTransporter({
+// ✅ Fixed incorrect function name (createTransporter → createTransport)
+const transporter = nodemailer.createTransport({
   service: process.env.EMAIL_SERVICE || 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
-  }
+    pass: process.env.EMAIL_PASS,
+  },
 });
 
-const sendEmail = async (options) => {
+// Utility to send email
+const sendMail = async (options) => {
   try {
-    const mailOptions = {
-      from: `Fundraising Portal <${process.env.EMAIL_USER}>`,
-      to: options.to,
-      subject: options.subject,
-      html: options.html,
-      text: options.text
-    };
-
-    const info = await transporter.sendMail(mailOptions);
-    logger.info(`Email sent: ${info.messageId}`);
-    return info;
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      ...options,
+    });
+    logger.info(`Email sent to ${options.to}`);
   } catch (error) {
-    logger.error('Error sending email:', error);
+    logger.error(`Failed to send email: ${error.message}`);
     throw error;
   }
 };
 
-module.exports = { sendEmail };
+module.exports = { transporter, sendMail };

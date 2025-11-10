@@ -1,6 +1,6 @@
 // tests/auth.test.js
 const request = require('supertest');
-const app = require('../app');
+const app = require('../../app');
 const { setupTestDatabase, cleanupTestDatabase } = require('./setup');
 
 describe('Authentication Tests', () => {
