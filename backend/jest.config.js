@@ -1,21 +1,26 @@
 module.exports = {
+  rootDir: './src',
   testEnvironment: 'node',
-  coverageDirectory: 'coverage',
+  verbose: true,
+  testMatch: ['**/tests/**/*.test.js'],
+  setupFiles: ['./tests/setup-env.js'],
+
+  moduleNameMapper: {
+    '^@src/(.*)$': '<rootDir>/$1',
+  },
+
   collectCoverageFrom: [
-    'src/**/*.js',
-    '!src/tests/**',
+    '**/*.js',
+    '!tests/**',
     '!node_modules/**'
   ],
-  testMatch: [
-    '**/tests/**/*.test.js'
-  ],
-    setupFiles: ['./src/tests/setup-env.js'],
+  coverageDirectory: '../coverage',
   coverageThreshold: {
     global: {
       branches: 75,
       functions: 75,
       lines: 75,
-      statements: 75
-    }
-  }
+      statements: 75,
+    },
+  },
 };

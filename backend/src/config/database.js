@@ -1,50 +1,35 @@
+require('dotenv').config();
 const { Sequelize } = require('sequelize');
-const logger = require('../utils/logger');
-const path = require('path');
-require('dotenv').config({
-  path: process.env.NODE_ENV === 'test' ? path.resolve(process.cwd(), '.env.test') : path.resolve(process.cwd(), '.env'),
-});
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL environment variable is not set');
+const dbUrl = process.env.DATABASE_URL || '';
+
+const match = dbUrl.match(
+  /^postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/(.+)$/
+);
+
+if (!match) {
+  console.error('❌ DATABASE_URL format invalid or missing');
+  process.exit(1);
 }
 
-const isLocal =
-  process.env.DATABASE_URL.includes('localhost') || process.env.NODE_ENV === 'development';
+const [_, user, password, host, port, database] = match;
 
-const sequelize = new Sequelize(process.env.DATABASE_URL, {
+const isTest = process.env.NODE_ENV === 'test';
+const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+
+const sequelize = new Sequelize(database, user, password, {
+  host,
+  port,
   dialect: 'postgres',
-  logging:
-    process.env.NODE_ENV === 'development'
-      ? (msg) => logger.debug(msg)
-      : false,
-  pool: {
-    max: parseInt(process.env.DB_POOL_MAX || 10),
-    min: parseInt(process.env.DB_POOL_MIN || 2),
-    acquire: 30000,
-    idle: 10000,
-  },
-  dialectOptions: isLocal
-    ? {}
-    : {
-        ssl: {
-          require: true,
-          rejectUnauthorized: false,
-        },
-      },
-  retry: { max: 3 },
+  dialectOptions: !isTest && !isLocal
+    ? { ssl: { require: true, rejectUnauthorized: false } } // ✅ Cloud/Supabase
+    : {}, // ✅ Disable SSL for Jest/local
+  logging: false,
 });
 
-// ✅ Only authenticate outside test mode
-if (process.env.NODE_ENV !== 'test') {
-  sequelize
-    .authenticate()
-    .then(() =>
-      console.log('✅ Database connection established successfully')
-    )
-    .catch((err) =>
-      console.error('❌ Unable to connect to database:', err.message)
-    );
-}
+sequelize
+  .authenticate()
+  .then(() => console.log('✅ Database connection established successfully'))
+  .catch((err) => console.error('❌ Database connection failed:', err));
 
 module.exports = { sequelize };
