@@ -1,26 +1,26 @@
 import axios from 'axios';
 
-// 🌍 API base URL (change VITE_API_URL in .env if needed)
+// 🌍 Base URL (auto-uses .env if available)
 const API_URL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api/events`
   : 'http://localhost:5000/api/events';
 
-// 🔄 Helper function to convert backend snake_case → frontend camelCase
+// 🧹 Normalize backend snake_case → frontend camelCase
 const normalizeEvent = (e: any) => ({
   id: e.id,
   title: e.title,
   description: e.description,
-  targetAmount: parseFloat(e.target_amount),
-  currentAmount: parseFloat(e.current_amount),
+  targetAmount: parseFloat(e.target_amount ?? e.targetAmount ?? 0),
+  currentAmount: parseFloat(e.current_amount ?? e.currentAmount ?? 0),
   category: e.category,
-  image: e.image_url,
+  image: e.image_url ?? e.image,
   status: e.status,
-  startDate: e.start_date,
-  endDate: e.end_date,
-  createdAt: e.created_at,
-  updatedAt: e.updated_at,
-  organizerId: e.organizer_id,
-  organizerName: e.organizer?.name || 'Unknown',
+  startDate: e.start_date ?? e.startDate,
+  endDate: e.end_date ?? e.endDate,
+  createdAt: e.created_at ?? e.createdAt,
+  updatedAt: e.updated_at ?? e.updatedAt,
+  organizerId: e.organizer_id ?? e.organizerId,
+  organizerName: e.organizer?.name || e.organizerName || 'Unknown',
 });
 
 // 🧩 Type definitions
@@ -52,34 +52,43 @@ export interface CreateEventData {
 
 // 🧠 All event-related API functions
 export const eventService = {
-  // 🔹 Get all events (for Browse page)
+  /**
+   * 🔹 Get all events (supports search + filter by category or status)
+   */
   getAllEvents: async (params?: { search?: string; status?: string; category?: string }) => {
-  const queryParams = new URLSearchParams();
+    const queryParams = new URLSearchParams();
 
-  if (params?.search) queryParams.append('search', params.search);
-  if (params?.status) queryParams.append('status', params.status);
-  if (params?.category) queryParams.append('category', params.category);
+    if (params?.search) queryParams.append('search', params.search.trim());
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.category) queryParams.append('category', params.category);
 
-  const url = queryParams.toString() ? `${API_URL}?${queryParams}` : API_URL;
-  const response = await axios.get(url);
+    const url = queryParams.toString() ? `${API_URL}?${queryParams}` : API_URL;
+    const response = await axios.get(url);
 
-  return {
-    ...response.data,
-    data: response.data.data.map(normalizeEvent),
-  };
-},
+    return {
+      ...response.data,
+      data: Array.isArray(response.data.data)
+        ? response.data.data.map(normalizeEvent)
+        : [],
+    };
+  },
 
-
-  // 🔹 Search events (optional, used for search bar)
+  /**
+   * 🔹 Search events only (alternative call used for live search bar)
+   */
   searchEvents: async (query: string) => {
     const response = await axios.get(`${API_URL}?search=${encodeURIComponent(query)}`);
     return {
       ...response.data,
-      data: response.data.data.map(normalizeEvent),
+      data: Array.isArray(response.data.data)
+        ? response.data.data.map(normalizeEvent)
+        : [],
     };
   },
 
-  // 🔹 Get single event by ID
+  /**
+   * 🔹 Get single event by ID
+   */
   getEventById: async (id: string) => {
     const response = await axios.get(`${API_URL}/${id}`);
     return {
@@ -88,7 +97,9 @@ export const eventService = {
     };
   },
 
-  // 🔹 Create a new event (organizer only)
+  /**
+   * 🔹 Create a new event (for organizers)
+   */
   createEvent: async (eventData: CreateEventData) => {
     const payload = {
       title: eventData.title,
@@ -105,14 +116,20 @@ export const eventService = {
     return axios.post(API_URL, payload, { headers });
   },
 
-  // 🔹 Get events created by logged-in organizer
+  /**
+   * 🔹 Get events created by the logged-in organizer
+   */
   getMyEvents: async () => {
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
+
     const response = await axios.get(`${API_URL}/my/events`, { headers });
+
     return {
       ...response.data,
-      data: response.data.data.map(normalizeEvent),
+      data: Array.isArray(response.data.data)
+        ? response.data.data.map(normalizeEvent)
+        : [],
     };
   },
 };
