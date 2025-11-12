@@ -4,11 +4,10 @@ module.exports = {
   verbose: true,
   testMatch: ['**/tests/**/*.test.js'],
   setupFiles: ['./tests/setup-env.js'],
-
+  setupFilesAfterEnv: ['<rootDir>/tests/setup-jest.js'],
   moduleNameMapper: {
     '^@src/(.*)$': '<rootDir>/$1',
   },
-
   collectCoverageFrom: [
     '**/*.js',
     '!tests/**',

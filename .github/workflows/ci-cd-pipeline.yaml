@@ -89,6 +89,8 @@ jobs:
         run: npm ci
 
       - name: Run Tests with Coverage
+        env:
+          NODE_ENV: test
         run: npm test -- --coverage
 
       - name: Enforce Coverage >= 75%

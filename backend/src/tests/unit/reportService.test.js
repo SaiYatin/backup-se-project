@@ -1,9 +1,10 @@
-jest.mock('../../../models', () => ({
+jest.mock('../../models', () => ({
   Report: {
-    findAll: jest.fn(() => Promise.resolve([{ id: 1, title: 'Mock Report' }]))
+    findAll: jest.fn(() => Promise.resolve([{ id: 1, title: 'Mock Report' }])),
   },
 }));
-jest.mock('../../../utils/logger', () => ({
+
+jest.mock('../../utils/logger', () => ({
   info: jest.fn(),
   error: jest.fn(),
 }));
