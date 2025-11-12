@@ -50,6 +50,16 @@ export interface CreateEventData {
   image?: string;
 }
 
+export interface UpdateEventData {
+  title?: string;
+  description?: string;
+  targetAmount?: number;
+  category?: string;
+  endDate?: string;
+  image?: string;
+  status?: 'active' | 'pending' | 'completed' | 'cancelled';
+}
+
 // 🧠 All event-related API functions
 export const eventService = {
   /**
@@ -74,7 +84,7 @@ export const eventService = {
   },
 
   /**
-   * 🔹 Search events only (alternative call used for live search bar)
+   * 🔹 Search events (used for live search)
    */
   searchEvents: async (query: string) => {
     const response = await axios.get(`${API_URL}?search=${encodeURIComponent(query)}`);
@@ -98,7 +108,7 @@ export const eventService = {
   },
 
   /**
-   * 🔹 Create a new event (for organizers)
+   * 🔹 Create a new event (organizer only)
    */
   createEvent: async (eventData: CreateEventData) => {
     const payload = {
@@ -131,5 +141,36 @@ export const eventService = {
         ? response.data.data.map(normalizeEvent)
         : [],
     };
+  },
+
+  /**
+   * 🔹 Update an event (organizer only)
+   */
+  updateEvent: async (id: string, updates: UpdateEventData) => {
+    const token = localStorage.getItem('token');
+    const headers = { Authorization: `Bearer ${token}` };
+
+    const payload = {
+      ...(updates.title && { title: updates.title }),
+      ...(updates.description && { description: updates.description }),
+      ...(updates.targetAmount && { target_amount: updates.targetAmount }),
+      ...(updates.endDate && { end_date: updates.endDate }),
+      ...(updates.category && { category: updates.category }),
+      ...(updates.image && { image_url: updates.image }),
+      ...(updates.status && { status: updates.status }),
+    };
+
+    const response = await axios.put(`${API_URL}/${id}`, payload, { headers });
+    return { ...response.data, data: normalizeEvent(response.data.data) };
+  },
+
+  /**
+   * 🔹 Delete an event (organizer only)
+   */
+  deleteEvent: async (id: string) => {
+    const token = localStorage.getItem('token');
+    const headers = { Authorization: `Bearer ${token}` };
+    const response = await axios.delete(`${API_URL}/${id}`, { headers });
+    return response.data;
   },
 };
