@@ -16,6 +16,13 @@ const logger = require('./utils/logger');
 const app = express();
 require('dotenv').config();
 
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
+
 // Security middleware
 app.use(helmet());
 
@@ -184,5 +191,7 @@ app.use('*', (req, res) => {
 
 // Global error handler
 app.use(errorHandler);
+
+
 
 module.exports = app;

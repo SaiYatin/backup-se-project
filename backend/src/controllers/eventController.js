@@ -1,12 +1,23 @@
 const { Event, User, Pledge } = require('../models');
 const { auditLog } = require('../utils/logger');
+const { Op } = require('sequelize');
 
-// Create Event
+// Log environment for debugging
+console.log("🚀 NODE_ENV =", process.env.NODE_ENV);
+
+// ===============================
+// ✅ CREATE EVENT
+// ===============================
 exports.createEvent = async (req, res, next) => {
   try {
     const { title, description, target_amount, end_date, category } = req.body;
 
-    // Create event with Sequelize
+    // Force all dev-mode events to be active
+    const eventStatus =
+      process.env.NODE_ENV === 'development' ? 'active' : 'pending';
+
+    console.log('🟢 Creating event with status:', eventStatus);
+
     const event = await Event.create({
       title,
       description,
@@ -14,50 +25,48 @@ exports.createEvent = async (req, res, next) => {
       end_date,
       category,
       organizer_id: req.user.id,
-      status: 'pending', // Default status for admin approval
-      current_amount: 0
+      status: eventStatus, // explicitly set BEFORE DB default
+      current_amount: 0,
     });
 
-    // Include organizer info in response
+    // ✅ Double-check DB update in case Sequelize overrides defaults
+    if (event.status !== eventStatus) {
+      await event.update({ status: eventStatus });
+      console.log('✅ Forced status update after creation');
+    }
+
     const eventWithOrganizer = await Event.findByPk(event.id, {
       include: [
-        { 
-          model: User, 
+        {
+          model: User,
           as: 'organizer',
-          attributes: ['id', 'name', 'email'] 
-        }
-      ]
-    });
-
-    // Log event creation
-    auditLog.create('Event', event.id, req.user.id, {
-      title: event.title,
-      target_amount: event.target_amount,
-      category: event.category
+          attributes: ['id', 'name', 'email'],
+        },
+      ],
     });
 
     res.status(201).json({
       success: true,
       message: 'Event created successfully',
-      data: eventWithOrganizer
+      data: eventWithOrganizer,
     });
   } catch (error) {
+    console.error('❌ Event creation failed:', error);
     next(error);
   }
 };
 
-const { Op } = require('sequelize');
-
+// ===============================
+// ✅ GET ALL EVENTS (with filters + search)
+// ===============================
 exports.getAllEvents = async (req, res, next) => {
   try {
     const { status, category, search } = req.query;
 
-    // Build filter conditions
     const whereClause = {};
     if (status) whereClause.status = status;
     if (category) whereClause.category = category;
 
-    // Add search support (matches title or description)
     if (search) {
       whereClause[Op.or] = [
         { title: { [Op.iLike]: `%${search}%` } },
@@ -68,7 +77,11 @@ exports.getAllEvents = async (req, res, next) => {
     const events = await Event.findAll({
       where: whereClause,
       include: [
-        { model: User, as: 'organizer', attributes: ['id', 'name', 'email'] }
+        {
+          model: User,
+          as: 'organizer',
+          attributes: ['id', 'name', 'email']
+        }
       ],
       order: [['created_at', 'DESC']]
     });
@@ -83,19 +96,19 @@ exports.getAllEvents = async (req, res, next) => {
   }
 };
 
-
-// Get Single Event
+// ===============================
+// ✅ GET SINGLE EVENT BY ID
+// ===============================
 exports.getEventById = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // Fetch event with related data
     const event = await Event.findByPk(id, {
       include: [
-        { 
-          model: User, 
+        {
+          model: User,
           as: 'organizer',
-          attributes: ['id', 'name', 'email'] 
+          attributes: ['id', 'name', 'email']
         },
         {
           model: Pledge,
@@ -127,18 +140,14 @@ exports.getEventById = async (req, res, next) => {
   }
 };
 
-// Get Events by Organizer
+// ===============================
+// ✅ GET EVENTS CREATED BY ORGANIZER
+// ===============================
 exports.getMyEvents = async (req, res, next) => {
   try {
-    // Get events created by logged-in user
     const events = await Event.findAll({
       where: { organizer_id: req.user.id },
-      include: [
-        {
-          model: Pledge,
-          as: 'pledges'
-        }
-      ],
+      include: [{ model: Pledge, as: 'pledges' }],
       order: [['created_at', 'DESC']]
     });
 
@@ -152,13 +161,14 @@ exports.getMyEvents = async (req, res, next) => {
   }
 };
 
-// Update Event (with ownership check)
+// ===============================
+// ✅ UPDATE EVENT
+// ===============================
 exports.updateEvent = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { title, description, target_amount, end_date, category } = req.body;
 
-    // Find event
     const event = await Event.findByPk(id);
 
     if (!event) {
@@ -168,7 +178,6 @@ exports.updateEvent = async (req, res, next) => {
       });
     }
 
-    // Security check: Only organizer can update
     if (event.organizer_id !== req.user.id) {
       return res.status(403).json({
         success: false,
@@ -176,7 +185,6 @@ exports.updateEvent = async (req, res, next) => {
       });
     }
 
-    // Update event
     await event.update({
       title: title || event.title,
       description: description || event.description,
@@ -185,22 +193,20 @@ exports.updateEvent = async (req, res, next) => {
       category: category || event.category
     });
 
-    // Fetch updated event with relations
     const updatedEvent = await Event.findByPk(id, {
       include: [
-        { 
-          model: User, 
+        {
+          model: User,
           as: 'organizer',
-          attributes: ['id', 'name', 'email'] 
+          attributes: ['id', 'name', 'email']
         }
       ]
     });
 
-    // Log event update
     auditLog.update('Event', event.id, req.user.id, {
-      title: title || event.title,
-      target_amount: target_amount || event.target_amount,
-      category: category || event.category
+      title: updatedEvent.title,
+      target_amount: updatedEvent.target_amount,
+      category: updatedEvent.category
     });
 
     res.json({
@@ -213,14 +219,14 @@ exports.updateEvent = async (req, res, next) => {
   }
 };
 
-// Delete Event (with ownership check)
+// ===============================
+// ✅ DELETE EVENT
+// ===============================
 exports.deleteEvent = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // Find event
     const event = await Event.findByPk(id);
-
     if (!event) {
       return res.status(404).json({
         success: false,
@@ -228,7 +234,6 @@ exports.deleteEvent = async (req, res, next) => {
       });
     }
 
-    // Security check: Only organizer can delete
     if (event.organizer_id !== req.user.id) {
       return res.status(403).json({
         success: false,
@@ -236,13 +241,11 @@ exports.deleteEvent = async (req, res, next) => {
       });
     }
 
-    // Log event deletion
     auditLog.delete('Event', event.id, req.user.id, {
       title: event.title,
       status: event.status
     });
 
-    // Delete event
     await event.destroy();
 
     res.json({

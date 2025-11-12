@@ -20,14 +20,24 @@ export interface CreatePledgeData {
 
 export const pledgeService = {
   async submitPledge(pledgeData: CreatePledgeData) {
-    const response = await api.post('/pledges', pledgeData);
-    return response.data;
-  },
+  const payload = {
+    event_id: pledgeData.eventId,           // ✅ convert to snake_case
+    amount: pledgeData.amount,
+    is_anonymous: pledgeData.isAnonymous || false,
+    message: pledgeData.message || '',
+  };
 
-  async getPledgesForEvent(eventId: string) {
-    const response = await api.get(`/pledges/event/${eventId}`);
-    return response.data;
-  },
+  const response = await api.post('/pledges', payload);
+  return response.data;
+},
+
+
+async getPledgesForEvent(eventId: string) {
+  // ✅ Match backend’s getAllPledges route (with query parameter)
+  const response = await api.get(`/pledges?event_id=${eventId}`);
+  return response.data;
+},
+
 
   async getMyPledges() {
     const response = await api.get('/pledges/my');
