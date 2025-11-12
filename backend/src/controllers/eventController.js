@@ -46,25 +46,29 @@ exports.createEvent = async (req, res, next) => {
   }
 };
 
-// Get All Events
+const { Op } = require('sequelize');
+
 exports.getAllEvents = async (req, res, next) => {
   try {
-    const { status, category } = req.query;
-    
+    const { status, category, search } = req.query;
+
     // Build filter conditions
     const whereClause = {};
     if (status) whereClause.status = status;
     if (category) whereClause.category = category;
 
-    // Fetch events with Sequelize
+    // Add search support (matches title or description)
+    if (search) {
+      whereClause[Op.or] = [
+        { title: { [Op.iLike]: `%${search}%` } },
+        { description: { [Op.iLike]: `%${search}%` } }
+      ];
+    }
+
     const events = await Event.findAll({
       where: whereClause,
       include: [
-        { 
-          model: User, 
-          as: 'organizer',
-          attributes: ['id', 'name', 'email'] 
-        }
+        { model: User, as: 'organizer', attributes: ['id', 'name', 'email'] }
       ],
       order: [['created_at', 'DESC']]
     });
@@ -78,6 +82,7 @@ exports.getAllEvents = async (req, res, next) => {
     next(error);
   }
 };
+
 
 // Get Single Event
 exports.getEventById = async (req, res, next) => {

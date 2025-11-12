@@ -53,16 +53,22 @@ export interface CreateEventData {
 // 🧠 All event-related API functions
 export const eventService = {
   // 🔹 Get all events (for Browse page)
-  getAllEvents: async (filters?: { status?: string; category?: string }) => {
-    const queryParams = new URLSearchParams(filters as Record<string, string>).toString();
-    const url = queryParams ? `${API_URL}?${queryParams}` : API_URL;
-    const response = await axios.get(url);
+  getAllEvents: async (params?: { search?: string; status?: string; category?: string }) => {
+  const queryParams = new URLSearchParams();
 
-    return {
-      ...response.data,
-      data: response.data.data.map(normalizeEvent),
-    };
-  },
+  if (params?.search) queryParams.append('search', params.search);
+  if (params?.status) queryParams.append('status', params.status);
+  if (params?.category) queryParams.append('category', params.category);
+
+  const url = queryParams.toString() ? `${API_URL}?${queryParams}` : API_URL;
+  const response = await axios.get(url);
+
+  return {
+    ...response.data,
+    data: response.data.data.map(normalizeEvent),
+  };
+},
+
 
   // 🔹 Search events (optional, used for search bar)
   searchEvents: async (query: string) => {
