@@ -1,23 +1,29 @@
 import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search } from 'lucide-react';
+import { Search, Filter } from 'lucide-react';
 import EventCard from '@/components/events/EventCard';
 import { eventService, Event } from '@/services/eventService';
 import { toast } from 'sonner';
+import { Select, SelectTrigger, SelectContent, SelectItem } from '@/components/ui/select';
 
 const Events = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [category, setCategory] = useState('');
+  const [status, setStatus] = useState('');
 
+  // ✅ Load all events initially
   useEffect(() => {
     loadEvents();
   }, []);
 
-  const loadEvents = async () => {
+  // ✅ Fetch from backend
+  const loadEvents = async (filters?: { search?: string; category?: string; status?: string }) => {
     try {
-      const response = await eventService.getAllEvents();
+      setLoading(true);
+      const response = await eventService.getAllEvents(filters);
       setEvents(response.data || []);
     } catch (error: any) {
       toast.error('Failed to load events');
@@ -26,32 +32,38 @@ const Events = () => {
     }
   };
 
+  // ✅ Search handler
   const handleSearch = async () => {
-    if (!searchQuery.trim()) {
+    if (!searchQuery.trim() && !category && !status) {
       loadEvents();
       return;
     }
 
     try {
-      const response = await eventService.searchEvents(searchQuery);
+      setLoading(true);
+      const response = await eventService.getAllEvents({
+        search: searchQuery.trim(),
+        category,
+        status,
+      });
       setEvents(response.data || []);
     } catch (error: any) {
       toast.error('Search failed');
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  // ✅ Optional: auto-refresh results when filters change
+  useEffect(() => {
+    if (!loading) handleSearch();
+  }, [category, status]);
 
   return (
     <div className="min-h-screen bg-gradient-subtle py-12">
       <div className="container mx-auto px-4">
         <div className="max-w-7xl mx-auto space-y-8">
+          {/* 🏷️ Header */}
           <div className="text-center space-y-4">
             <h1 className="text-4xl md:text-5xl font-bold">Browse Fundraising Events</h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -59,25 +71,63 @@ const Events = () => {
             </p>
           </div>
 
-          <div className="flex gap-2 max-w-2xl mx-auto">
-            <Input
-              type="text"
-              placeholder="Search events..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              className="flex-1"
-            />
-            <Button onClick={handleSearch} variant="hero" className="gap-2">
-              <Search className="h-4 w-4" />
-              Search
-            </Button>
+          {/* 🔍 Search and Filters */}
+          <div className="flex flex-col md:flex-row gap-3 md:gap-4 max-w-4xl mx-auto items-center justify-center">
+            <div className="flex flex-1 gap-2 w-full">
+              <Input
+                type="text"
+                placeholder="Search events..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                className="flex-1"
+              />
+              <Button onClick={handleSearch} variant="hero" className="gap-2">
+                <Search className="h-4 w-4" />
+                Search
+              </Button>
+            </div>
+
+            {/* 🧭 Category filter */}
+<Select onValueChange={(val) => setCategory(val === 'all' ? '' : val)} value={category || 'all'}>
+  <SelectTrigger className="w-[180px]">
+    <Filter className="h-4 w-4 mr-2" />
+    {category ? category : 'Category'}
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="all">All Categories</SelectItem>
+    <SelectItem value="Education">Education</SelectItem>
+    <SelectItem value="Healthcare">Healthcare</SelectItem>
+    <SelectItem value="Environment">Environment</SelectItem>
+    <SelectItem value="Sports">Sports</SelectItem>
+    <SelectItem value="Community">Community</SelectItem>
+  </SelectContent>
+</Select>
+
+{/* ⚙️ Status filter */}
+<Select onValueChange={(val) => setStatus(val === 'all' ? '' : val)} value={status || 'all'}>
+  <SelectTrigger className="w-[160px]">
+    {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Status'}
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="all">All Statuses</SelectItem>
+    <SelectItem value="active">Active</SelectItem>
+    <SelectItem value="pending">Pending</SelectItem>
+    <SelectItem value="completed">Completed</SelectItem>
+  </SelectContent>
+</Select>
+
           </div>
 
-          {events.length === 0 ? (
+          {/* 🧾 Results */}
+          {loading ? (
+            <div className="flex items-center justify-center min-h-[50vh]">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          ) : events.length === 0 ? (
             <div className="text-center py-16">
               <p className="text-lg text-muted-foreground">
-                No events found. Check back soon for new fundraising opportunities!
+                No events found. Try adjusting your filters or check back later!
               </p>
             </div>
           ) : (
