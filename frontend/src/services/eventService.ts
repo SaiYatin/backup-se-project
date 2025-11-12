@@ -1,4 +1,30 @@
 import api from './api';
+// eventService.ts
+import axios from 'axios';
+
+const API_URL = 'http://localhost:5000/api/events';
+
+export const eventService = {
+  createEvent: async (eventData: any) => {
+    // Convert frontend camelCase → backend snake_case
+    const payload = {
+      title: eventData.title,
+      description: eventData.description,
+      target_amount: eventData.targetAmount,
+      end_date: eventData.endDate,
+      category: eventData.category,
+      image_url: eventData.image,
+    };
+
+    const token = localStorage.getItem('token');
+    const headers = {
+      Authorization: `Bearer ${token}`,
+    };
+
+    return axios.post(API_URL, payload, { headers });
+  },
+};
+
 
 export interface Event {
   id: string;
@@ -23,41 +49,3 @@ export interface CreateEventData {
   endDate: string;
   image?: string;
 }
-
-export const eventService = {
-  async getAllEvents() {
-    const response = await api.get('/events');
-    // Backend returns: { success: true, data: [...] }
-    return response.data.data || response.data; // Handle both formats
-  },
-
-  async getEventById(id: string) {
-    const response = await api.get(`/events/${id}`);
-    return response.data;
-  },
-
-  async createEvent(eventData: CreateEventData) {
-    const response = await api.post('/events', eventData);
-    return response.data;
-  },
-
-  async updateEvent(id: string, eventData: Partial<CreateEventData>) {
-    const response = await api.put(`/events/${id}`, eventData);
-    return response.data;
-  },
-
-  async deleteEvent(id: string) {
-    const response = await api.delete(`/events/${id}`);
-    return response.data;
-  },
-
-  async searchEvents(query: string) {
-    const response = await api.get(`/events/search?q=${query}`);
-    return response.data;
-  },
-
-  async filterEvents(category: string) {
-    const response = await api.get(`/events/filter?category=${category}`);
-    return response.data;
-  },
-};
