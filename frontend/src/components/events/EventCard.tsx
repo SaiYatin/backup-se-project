@@ -37,6 +37,14 @@ const EventCard = ({ event }: EventCardProps) => {
             >
               {event.category}
             </Badge>
+            {event.status === 'completed' && (
+              <Badge
+                className="absolute top-3 left-3 bg-green-500 text-white"
+                variant="default"
+              >
+                ✓ Completed
+              </Badge>
+            )}
           </div>
         </CardHeader>
 
