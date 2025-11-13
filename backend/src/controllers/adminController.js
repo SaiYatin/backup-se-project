@@ -18,15 +18,33 @@ exports.getAllEvents = async (req, res, next) => {
           model: User,
           as: 'organizer',
           attributes: ['id', 'name', 'email']
+        },
+        {
+          model: Pledge,
+          as: 'pledges'
         }
       ],
       order: [['created_at', 'DESC']]
     });
 
+    // Add pledge statistics to each event
+    const eventsWithStats = events.map(event => {
+      const pledges = event.pledges || [];
+      const pledgeCount = pledges.length;
+      const currentAmount = pledges.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+
+      const eventData = event.toJSON();
+      return {
+        ...eventData,
+        pledgeCount,
+        current_amount: currentAmount
+      };
+    });
+
     res.json({
       success: true,
-      count: events.length,
-      data: events
+      count: eventsWithStats.length,
+      data: eventsWithStats
     });
   } catch (error) {
     next(error);
@@ -66,7 +84,7 @@ exports.getAllPledges = async (req, res, next) => {
 exports.getFlaggedEvents = async (req, res, next) => {
   try {
     const events = await Event.findAll({
-      where: { status: 'rejected' }, // Using 'rejected' as flagged
+      where: { status: 'flagged' }, // Look for 'flagged' status
       include: [
         {
           model: User,
@@ -87,7 +105,7 @@ exports.getFlaggedEvents = async (req, res, next) => {
   }
 };
 
-// Approve event (Task 3)
+// Approve event (FR-012: Admin approve/reject events)
 exports.approveEvent = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -109,14 +127,26 @@ exports.approveEvent = async (req, res, next) => {
       });
     }
 
+    // Check if already active
+    if (event.status === 'active') {
+      return res.json({
+        success: true,
+        message: 'Event is already active',
+        data: event
+      });
+    }
+
     // Update status to active
     await event.update({ status: 'active' });
 
     // Log event approval
-    auditLog.approve('Event', event.id, req.user.id, {
+    auditLog.approve?.('Event', event.id, req.user.id, {
       title: event.title,
-      organizerId: event.organizer_id
+      organizerId: event.organizer_id,
+      organizerName: event.organizer?.name
     });
+
+    console.log(`✅ Event approved: "${event.title}" by admin ${req.user.id}`);
 
     // TODO: Send approval email via Madhav's service
     // await emailService.sendApprovalEmail({
@@ -131,11 +161,12 @@ exports.approveEvent = async (req, res, next) => {
       data: event
     });
   } catch (error) {
+    console.error('❌ Approve event error:', error);
     next(error);
   }
 };
 
-// Reject event (Task 3)
+// Reject event (FR-012: Admin approve/reject events)
 exports.rejectEvent = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -162,11 +193,17 @@ exports.rejectEvent = async (req, res, next) => {
     await event.update({ status: 'rejected' });
 
     // Log event rejection
-    auditLog.reject('Event', event.id, req.user.id, {
+    auditLog.reject?.('Event', event.id, req.user.id, {
       title: event.title,
       organizerId: event.organizer_id,
+      organizerName: event.organizer?.name,
       reason: reason || 'Does not meet guidelines'
     });
+
+    console.log(`❌ Event rejected: "${event.title}" by admin ${req.user.id}`);
+    if (reason) {
+      console.log(`   Reason: ${reason}`);
+    }
 
     // TODO: Send rejection email via Madhav's service
     // await emailService.sendRejectionEmail({
@@ -181,11 +218,12 @@ exports.rejectEvent = async (req, res, next) => {
       data: event
     });
   } catch (error) {
+    console.error('❌ Reject event error:', error);
     next(error);
   }
 };
 
-// Flag event (Task 3)
+// Flag event for review (FR-012 related)
 exports.flagEvent = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -208,8 +246,21 @@ exports.flagEvent = async (req, res, next) => {
       });
     }
 
-    // Update status to rejected (using as flagged)
-    await event.update({ status: 'rejected' });
+    // Update status to flagged (for admin review)
+    await event.update({ status: 'flagged' });
+
+    // Log event flagging
+    auditLog.update?.('Event', event.id, req.user.id, {
+      action: 'flagged',
+      title: event.title,
+      reason: reason || 'Flagged for review',
+      organizerId: event.organizer_id
+    });
+
+    console.log(`🚩 Event flagged: "${event.title}" by admin ${req.user.id}`);
+    if (reason) {
+      console.log(`   Reason: ${reason}`);
+    }
 
     // TODO: Send flag notification via Madhav's service
     // await emailService.sendFlagNotification({
@@ -224,6 +275,7 @@ exports.flagEvent = async (req, res, next) => {
       data: event
     });
   } catch (error) {
+    console.error('❌ Flag event error:', error);
     next(error);
   }
 };
