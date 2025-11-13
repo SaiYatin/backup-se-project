@@ -141,8 +141,9 @@ if (newPledge) {
 
 
     try {
+      // Refresh to get updated status (in case event was completed)
       await new Promise((resolve) => setTimeout(resolve, 1200));
-      await loadPledges();
+      await Promise.all([loadEventDetails(), loadPledges()]);
     } catch (err) {
       console.warn('Refresh failed:', err);
     }
@@ -204,6 +205,11 @@ if (newPledge) {
                 <Badge className="absolute top-4 right-4 bg-background/90 backdrop-blur-sm">
                   {event.category}
                 </Badge>
+                {event.status === 'completed' && (
+                  <Badge className="absolute top-4 left-4 bg-green-500 text-white text-lg px-4 py-2">
+                    ✓ Goal Reached!
+                  </Badge>
+                )}
               </div>
 
               <div className="p-8 space-y-6">
@@ -317,12 +323,26 @@ if (newPledge) {
               </Button>
             </div>
 
-            <PledgeForm
-              eventId={event.id}
-              onSuccess={(amount?: number, newPledge?: any) =>
-                handlePledgeSuccess(Number(amount ?? 0), newPledge)
-              }
-            />
+            {event.status === 'completed' ? (
+              <div className="bg-card rounded-lg p-6 shadow-card">
+                <div className="text-center space-y-4">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                    <span className="text-3xl">🎉</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-green-600">Goal Reached!</h3>
+                  <p className="text-muted-foreground">
+                    This event has successfully reached its fundraising goal. Thank you to all supporters!
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <PledgeForm
+                eventId={event.id}
+                onSuccess={(amount?: number, newPledge?: any) =>
+                  handlePledgeSuccess(Number(amount ?? 0), newPledge)
+                }
+              />
+            )}
           </div>
         </div>
       </div>

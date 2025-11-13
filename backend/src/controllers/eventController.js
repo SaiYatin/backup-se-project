@@ -85,8 +85,9 @@ exports.getAllEvents = async (req, res, next) => {
 
     const whereClause = {};
 
-    // Non-admins can only see active events
+    // Non-admins can see active and completed events (not pending/rejected)
     // Admins can see all events or filter by status
+
 // Status filtering
 if (status) {
   // apply requested filter
@@ -97,6 +98,7 @@ if (status) {
     whereClause.status = 'active';
   }
 }
+
 
 
     if (category) whereClause.category = category;
