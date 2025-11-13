@@ -1,7 +1,15 @@
 const pledgeController = require('../../controllers/pledgeController');
 const { Pledge, Event, User } = require('../../models');
+const eventStatusService = require('../../services/eventStatusService');
+const logger = require('../../utils/logger');
 
 jest.mock('../../models');
+jest.mock('../../services/eventStatusService');
+jest.mock('../../utils/logger', () => ({
+  auditLog: {
+    create: jest.fn()
+  }
+}));
 
 describe('Pledge Controller Unit Tests', () => {
   let req, res, next;
@@ -19,6 +27,10 @@ describe('Pledge Controller Unit Tests', () => {
     };
     next = jest.fn();
     jest.clearAllMocks();
+    // Reset mocks
+    if (eventStatusService.checkAndUpdateEventStatus) {
+      eventStatusService.checkAndUpdateEventStatus.mockClear();
+    }
   });
 
   test('test_createPledge_with_valid_amount_succeeds', async () => {
@@ -32,20 +44,33 @@ describe('Pledge Controller Unit Tests', () => {
       id: 1,
       status: 'active',
       current_amount: 0,
+      title: 'Test Event',
+      reload: jest.fn().mockResolvedValue(undefined),
       update: jest.fn().mockResolvedValue({})
     };
 
     Event.findByPk = jest.fn().mockResolvedValue(mockEvent);
+    // Mock checkAndUpdateEventStatus to return the same value for both calls
+    eventStatusService.checkAndUpdateEventStatus.mockResolvedValue({ 
+      reason: null, 
+      updated: false 
+    });
+    
     Pledge.create = jest.fn().mockResolvedValue({
       id: 1,
       event_id: 1,
       donor_id: 1,
-      amount: 5000
+      amount: 5000,
+      is_anonymous: false
     });
+    
     Pledge.findByPk = jest.fn().mockResolvedValue({
       id: 1,
       event_id: 1,
-      amount: 5000
+      amount: 5000,
+      is_anonymous: false,
+      donor: { id: 1, name: 'Donor', email: 'donor@test.com' },
+      event: { id: 1, title: 'Test Event', target_amount: 10000, current_amount: 5000, status: 'active' }
     });
 
     await pledgeController.createPledge(req, res, next);
