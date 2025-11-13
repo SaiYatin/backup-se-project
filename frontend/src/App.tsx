@@ -2,8 +2,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import Navbar from "./components/common/Navbar";
 import Footer from "./components/common/Footer";
 import ProtectedRoute from "./components/common/ProtectedRoute";
@@ -15,13 +15,34 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
-// NEW IMPORTS - Added by Nighthawk166
+// Admin & Organizer imports
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminReports from "./pages/AdminReports";
+import OrganizerDashboard from "./pages/OrganizerDashboard";
 import EditEvent from "./pages/EditEvent";
 import CreateEvent from "./pages/CreateEvent";
-import AdminReports from "./pages/AdminReports";
 
 const queryClient = new QueryClient();
+
+// Role-based dashboard redirect component
+const DashboardRedirect = () => {
+  const { user } = useAuth();
+  
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Redirect based on role
+  switch (user.role) {
+    case 'admin':
+      return <Navigate to="/admin/dashboard" replace />;
+    case 'organizer':
+      return <Navigate to="/organizer/dashboard" replace />;
+    case 'donor':
+    default:
+      return <Dashboard />;
+  }
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -41,12 +62,12 @@ const App = () => (
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 
-                {/* Protected User Routes */}
+                {/* Protected User Routes - Auto-redirect based on role */}
                 <Route
                   path="/dashboard"
                   element={
                     <ProtectedRoute>
-                      <Dashboard />
+                      <DashboardRedirect />
                     </ProtectedRoute>
                   }
                 />
@@ -60,6 +81,14 @@ const App = () => (
                 />
                 
                 {/* Protected Organizer Routes */}
+                <Route
+                  path="/organizer/dashboard"
+                  element={
+                    <ProtectedRoute requiredRole="organizer">
+                      <OrganizerDashboard />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route
                   path="/events/new"
                   element={
