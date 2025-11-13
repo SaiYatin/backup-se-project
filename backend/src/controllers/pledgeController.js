@@ -4,11 +4,11 @@ const { checkAndUpdateEventStatus } = require('../services/eventStatusService');
 // Create Pledge
 exports.createPledge = async (req, res, next) => {
   try {
-    const { event_id, amount, message } = req.body;
+    const { event_id, amount, message, is_anonymous } = req.body;
 
-    // Check if event exists and is approved
+    // 1. Validate event
     const event = await Event.findByPk(event_id);
-    
+
     if (!event) {
       return res.status(404).json({
         success: false,
@@ -23,25 +23,30 @@ exports.createPledge = async (req, res, next) => {
       });
     }
 
-    // Ensure numeric arithmetic for DECIMAL fields
+    // 2. Validate amount
     const numericAmount = parseFloat(amount);
     if (Number.isNaN(numericAmount) || numericAmount <= 0) {
-      return res.status(400).json({ success: false, error: 'Invalid pledge amount' });
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid pledge amount'
+      });
     }
 
-    // Create pledge with Sequelize
+    // 3. Create pledge (NOW INCLUDES is_anonymous)
     const pledge = await Pledge.create({
       event_id,
       donor_id: req.user.id,
       amount: numericAmount,
       message: message || '',
+      is_anonymous: !!is_anonymous, // <- 🔥 FIXED HERE
       payment_status: 'pending'
     });
 
-    // Update event's current_amount (parse DECIMAL strings to numbers)
+    // 4. Update event total
     await event.update({
       current_amount: parseFloat(event.current_amount || 0) + numericAmount
     });
+
 
     // Check if event has reached its target and auto-complete if needed
     const statusCheck = await checkAndUpdateEventStatus(event_id);
@@ -62,12 +67,19 @@ exports.createPledge = async (req, res, next) => {
       ]
     });
 
-    // Log pledge creation
+    // 6. Hide donor info if anonymous (IMPORTANT)
+    if (pledge.is_anonymous && pledgeWithDetails?.donor) {
+      pledgeWithDetails.donor = null;
+    }
+
+    // 7. Log
     auditLog.create('Pledge', pledge.id, req.user.id, {
       event_id: event.id,
-      amount: amount,
+      amount: numericAmount,
+      is_anonymous: !!is_anonymous,
       payment_status: 'pending'
     });
+
 
     // Prepare response message
     let responseMessage = 'Pledge created successfully';
@@ -76,15 +88,18 @@ exports.createPledge = async (req, res, next) => {
     }
 
     res.status(201).json({
+
       success: true,
       message: responseMessage,
       data: pledgeWithDetails,
       eventStatusUpdated: statusCheck.updated
     });
+
   } catch (error) {
     next(error);
   }
 };
+
 
 // Get All Pledges (Admin or specific filters)
 exports.getAllPledges = async (req, res, next) => {

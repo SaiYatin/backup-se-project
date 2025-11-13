@@ -87,11 +87,19 @@ exports.getAllEvents = async (req, res, next) => {
 
     // Non-admins can see active and completed events (not pending/rejected)
     // Admins can see all events or filter by status
-    if (userRole !== 'admin') {
-      whereClause.status = { [Op.in]: ['active', 'completed'] };
-    } else if (status) {
-      whereClause.status = status;
-    }
+
+// Status filtering
+if (status) {
+  // apply requested filter
+  whereClause.status = status;
+} else {
+  // default = show only active events unless admin wants everything
+  if (userRole !== 'admin') {
+    whereClause.status = 'active';
+  }
+}
+
+
 
     if (category) whereClause.category = category;
 
