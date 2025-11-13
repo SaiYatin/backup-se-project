@@ -139,4 +139,113 @@ describe('Event Controller Unit Tests', () => {
       })
     );
   });
+
+  test('test_getMyEvents_returns_organizer_events', async () => {
+    req.user.id = 1;
+    Event.findAll = jest.fn().mockResolvedValue([
+      { 
+        id: 1, 
+        title: 'My Event 1', 
+        organizer_id: 1,
+        toJSON: () => ({ id: 1, title: 'My Event 1', organizer_id: 1 })
+      },
+      { 
+        id: 2, 
+        title: 'My Event 2', 
+        organizer_id: 1,
+        toJSON: () => ({ id: 2, title: 'My Event 2', organizer_id: 1 })
+      }
+    ]);
+
+    await eventController.getMyEvents(req, res, next);
+
+    expect(res.json).toHaveBeenCalled();
+  });
+
+  test('test_closeEvent_closes_event', async () => {
+    req.params.id = 1;
+    const mockEvent = {
+      id: 1,
+      organizer_id: 1,
+      status: 'active',
+      update: jest.fn().mockResolvedValue(true),
+      toJSON: () => ({ id: 1, status: 'completed' })
+    };
+
+    Event.findByPk = jest.fn().mockResolvedValue(mockEvent);
+
+    await eventController.closeEvent(req, res, next);
+
+    expect(res.json).toHaveBeenCalled();
+  });
+
+  test('test_getEventById_handles_not_found', async () => {
+    req.params.id = 1;
+    Event.findByPk = jest.fn().mockResolvedValue(null);
+
+    await eventController.getEventById(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test('test_updateEvent_handles_not_found', async () => {
+    req.params.id = 1;
+    req.body = { title: 'Updated' };
+    Event.findByPk = jest.fn().mockResolvedValue(null);
+
+    await eventController.updateEvent(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test('test_deleteEvent_handles_not_found', async () => {
+    req.params.id = 1;
+    Event.findByPk = jest.fn().mockResolvedValue(null);
+
+    await eventController.deleteEvent(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test('test_updateEvent_handles_unauthorized', async () => {
+    req.params.id = 1;
+    req.body = { title: 'Updated' };
+    req.user.id = 2;
+
+    const mockEvent = {
+      id: 1,
+      organizer_id: 1
+    };
+
+    Event.findByPk = jest.fn().mockResolvedValue(mockEvent);
+
+    await eventController.updateEvent(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  test('test_closeEvent_handles_not_found', async () => {
+    req.params.id = 1;
+    Event.findByPk = jest.fn().mockResolvedValue(null);
+
+    await eventController.closeEvent(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test('test_closeEvent_handles_unauthorized', async () => {
+    req.params.id = 1;
+    req.user.id = 2;
+
+    const mockEvent = {
+      id: 1,
+      organizer_id: 1
+    };
+
+    Event.findByPk = jest.fn().mockResolvedValue(mockEvent);
+
+    await eventController.closeEvent(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
 });

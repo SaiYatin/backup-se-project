@@ -34,6 +34,21 @@ jobs:
       - name: Verify Build (sanity check)
         run: node -v && npm -v
 
+      - name: Generate Build Report
+        run: |
+          echo "Build Report" > build_report.txt
+          echo "=============" >> build_report.txt
+          echo "Status: SUCCESS" >> build_report.txt
+          echo "Node Version: $(node -v)" >> build_report.txt
+          echo "NPM Version: $(npm -v)" >> build_report.txt
+          echo "Build Date: $(date)" >> build_report.txt
+
+      - name: Upload Build Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-report
+          path: backend/build_report.txt
+
   # ---------------------------
   # 2️⃣ LINT STAGE
   # ---------------------------
@@ -192,15 +207,32 @@ jobs:
           NODE_ENV: test
         run: npm test
 
-      - name: Enforce Coverage >= 75%
+      - name: Enforce Coverage >= 75% and Generate Report
         run: |
           COVERAGE=$(node -pe "require('./coverage/coverage-summary.json').total.lines.pct")
           echo "📊 Total Code Coverage: $COVERAGE%"
+          
+          # Generate simple coverage report
+          echo "Coverage Report" > coverage_report.txt
+          echo "===============" >> coverage_report.txt
+          echo "Lines Coverage: ${COVERAGE}%" >> coverage_report.txt
+          echo "Threshold: 75%" >> coverage_report.txt
+          
+          # Check if coverage meets threshold
           if (( $(echo "$COVERAGE < 75" | bc -l) )); then
+            echo "Status: FAIL" >> coverage_report.txt
             echo "❌ Coverage below 75% threshold"
             exit 1
+          else
+            echo "Status: PASS" >> coverage_report.txt
+            echo "✅ Coverage requirement met (>= 75%)"
           fi
-          echo "✅ Coverage requirement met (>= 75%)"
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: backend/coverage_report.txt
 
       - name: Upload Final Coverage Report
         uses: actions/upload-artifact@v4
@@ -263,11 +295,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download Build Report
+        uses: actions/download-artifact@v4
+        with:
+          name: build-report
+          path: backend/
+
+      - name: Download Lint Report
+        uses: actions/download-artifact@v4
+        with:
+          name: lint-report
+          path: backend/
+
+      - name: Download Coverage Report
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+          path: backend/
+
+      - name: Download Security Report
+        uses: actions/download-artifact@v4
+        with:
+          name: security-report
+          path: backend/
+
       - name: Prepare Deployment Package
         run: |
           mkdir -p deployment-package
           cp -r src package.json package-lock.json README.md deployment-package/
-          cp -r coverage lint_report.txt security_report.json deployment-package/ || true
+          cp build_report.txt lint_report.txt coverage_report.txt security_report.json deployment-package/ || true
           cd deployment-package
           zip -r ../deployment-package-${{ github.run_number }}.zip .
 

@@ -59,7 +59,7 @@ describe('Report Service Unit Tests', () => {
 
   test('test_generateEventReport_with_valid_event', async () => {
     const validUUID = '123e4567-e89b-12d3-a456-426614174000';
-    Event.findByPk = jest.fn().mockResolvedValue({
+    const mockEvent = {
       id: validUUID,
       title: 'Test',
       description: 'Desc',
@@ -68,15 +68,23 @@ describe('Report Service Unit Tests', () => {
       target_amount: 10000,
       current_amount: 5000,
       created_at: new Date(),
-      end_date: new Date(),
+      updated_at: new Date(),
       organizer: { id: 'org1', name: 'Org', email: 'org@test.com' },
       pledges: []
-    });
+    };
+    Event.findByPk = jest.fn().mockResolvedValue(mockEvent);
+    
+    // Mock sequelize.query for pledge timeline
+    const db = require('../../config/database');
+    if (db && db.sequelize) {
+      db.sequelize.query = jest.fn().mockResolvedValue([]);
+    }
 
     const result = await reportService.generateEventReport(validUUID, 'user1');
 
     expect(result).toBeDefined();
-    expect(result.event).toBeDefined();
+    expect(result.data).toBeDefined();
+    expect(result.data.event).toBeDefined();
   });
 
   test('test_getReports_filters_by_type', async () => {
@@ -95,5 +103,37 @@ describe('Report Service Unit Tests', () => {
     const result = await reportService.cleanupOldReports(90);
 
     expect(result).toBe(5);
+  });
+
+  test('test_getReports_filters_by_status', async () => {
+    Report.findAll = jest.fn().mockResolvedValue([
+      { id: 'r1', type: 'daily', status: 'completed' }
+    ]);
+
+    const result = await reportService.getReports({ status: 'completed' });
+
+    expect(Array.isArray(result)).toBe(true);
+    expect(Report.findAll).toHaveBeenCalled();
+  });
+
+  test('test_getReports_filters_by_date_range', async () => {
+    Report.findAll = jest.fn().mockResolvedValue([]);
+
+    const result = await reportService.getReports({
+      startDate: '2025-01-01',
+      endDate: '2025-01-31'
+    });
+
+    expect(Array.isArray(result)).toBe(true);
+    expect(Report.findAll).toHaveBeenCalled();
+  });
+
+  test('test_getReports_with_limit_and_offset', async () => {
+    Report.findAll = jest.fn().mockResolvedValue([]);
+
+    const result = await reportService.getReports({ limit: 10, offset: 5 });
+
+    expect(Array.isArray(result)).toBe(true);
+    expect(Report.findAll).toHaveBeenCalled();
   });
 });

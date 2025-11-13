@@ -98,4 +98,152 @@ describe('Auth Controller Unit Tests', () => {
       })
     );
   });
+
+  test('test_register_with_existing_email_returns_400', async () => {
+    req.body = {
+      name: 'Test User',
+      email: 'existing@example.com',
+      password: 'Test@123'
+    };
+
+    User.findOne = jest.fn().mockResolvedValue({
+      id: 1,
+      email: 'existing@example.com'
+    });
+
+    await authController.register(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: false
+      })
+    );
+  });
+
+  test('test_login_with_wrong_password_returns_401', async () => {
+    req.body = {
+      email: 'test@example.com',
+      password: 'wrongpassword'
+    };
+
+    const mockUser = {
+      id: 1,
+      email: 'test@example.com',
+      password_hash: 'hashedpassword',
+      role: 'donor'
+    };
+
+    User.findOne = jest.fn().mockResolvedValue(mockUser);
+    bcrypt.compare = jest.fn().mockResolvedValue(false);
+
+    await authController.login(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: false
+      })
+    );
+  });
+
+  test('test_getProfile_returns_user_data', async () => {
+    req.user = { id: 1 };
+    const mockUser = {
+      id: 1,
+      name: 'Test User',
+      email: 'test@example.com',
+      toJSON: () => ({ id: 1, name: 'Test User', email: 'test@example.com' })
+    };
+
+    User.findByPk = jest.fn().mockResolvedValue(mockUser);
+
+    await authController.getProfile(req, res, next);
+
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true
+      })
+    );
+  });
+
+  test('test_getProfile_handles_user_not_found', async () => {
+    req.user = { id: 1 };
+    User.findByPk = jest.fn().mockResolvedValue(null);
+
+    await authController.getProfile(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test('test_updateProfile_updates_user', async () => {
+    req.user = { id: 1 };
+    req.body = { name: 'Updated Name' };
+
+    const mockUser = {
+      id: 1,
+      name: 'Test User',
+      email: 'test@example.com',
+      update: jest.fn().mockResolvedValue(true),
+      toJSON: () => ({ id: 1, name: 'Updated Name', email: 'test@example.com' })
+    };
+
+    User.findByPk = jest.fn().mockResolvedValue(mockUser);
+
+    await authController.updateProfile(req, res, next);
+
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true
+      })
+    );
+  });
+
+  test('test_updateProfile_handles_user_not_found', async () => {
+    req.user = { id: 1 };
+    req.body = { name: 'Updated Name' };
+    User.findByPk = jest.fn().mockResolvedValue(null);
+
+    await authController.updateProfile(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test('test_updateProfile_handles_email_already_in_use', async () => {
+    req.user = { id: 1 };
+    req.body = { email: 'existing@example.com' };
+
+    const mockUser = {
+      id: 1,
+      email: 'test@example.com'
+    };
+
+    User.findByPk = jest.fn().mockResolvedValue(mockUser);
+    User.findOne = jest.fn().mockResolvedValue({
+      id: 2,
+      email: 'existing@example.com'
+    });
+
+    await authController.updateProfile(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  test('test_updateProfile_with_same_email_allowed', async () => {
+    req.user = { id: 1 };
+    req.body = { email: 'test@example.com' };
+
+    const mockUser = {
+      id: 1,
+      email: 'test@example.com',
+      update: jest.fn().mockResolvedValue(true),
+      toJSON: () => ({ id: 1, email: 'test@example.com' })
+    };
+
+    User.findByPk = jest.fn().mockResolvedValue(mockUser);
+
+    await authController.updateProfile(req, res, next);
+
+    expect(res.json).toHaveBeenCalled();
+  });
 });
