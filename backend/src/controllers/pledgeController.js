@@ -16,10 +16,22 @@ exports.createPledge = async (req, res, next) => {
       });
     }
 
+    // Check if event has expired and auto-complete if needed
+    const statusCheck = await checkAndUpdateEventStatus(event_id);
+    
+    // Reload event to get updated status
+    await event.reload();
+
     if (event.status !== 'active') {
+      const reason = statusCheck.reason === 'time_expired' 
+        ? 'This event has ended (time expired)'
+        : 'Cannot pledge to inactive events';
+      
       return res.status(400).json({
         success: false,
-        error: 'Cannot pledge to inactive events'
+        error: reason,
+        eventStatus: event.status,
+        completionReason: statusCheck.reason
       });
     }
 
@@ -43,8 +55,8 @@ exports.createPledge = async (req, res, next) => {
       current_amount: parseFloat(event.current_amount || 0) + numericAmount
     });
 
-    // Check if event has reached its target and auto-complete if needed
-    const statusCheck = await checkAndUpdateEventStatus(event_id);
+    // Check again if event has reached its target after pledge
+    const postPledgeCheck = await checkAndUpdateEventStatus(event_id);
     
     // Fetch pledge with related data
     const pledgeWithDetails = await Pledge.findByPk(pledge.id, {
@@ -71,10 +83,10 @@ exports.createPledge = async (req, res, next) => {
 
     // Prepare response message
     let responseMessage = 'Pledge created successfully';
-    if (statusCheck.updated) {
-      if (statusCheck.reason === 'target_reached') {
+    if (postPledgeCheck.updated) {
+      if (postPledgeCheck.reason === 'target_reached') {
         responseMessage += ` - Congratulations! The event "${event.title}" has reached its target and is now completed! 🎉`;
-      } else if (statusCheck.reason === 'time_expired') {
+      } else if (postPledgeCheck.reason === 'time_expired') {
         responseMessage += ` - The event "${event.title}" has ended (time expired) and is now completed.`;
       }
     }
@@ -83,8 +95,8 @@ exports.createPledge = async (req, res, next) => {
       success: true,
       message: responseMessage,
       data: pledgeWithDetails,
-      eventStatusUpdated: statusCheck.updated,
-      completionReason: statusCheck.reason
+      eventStatusUpdated: postPledgeCheck.updated,
+      completionReason: postPledgeCheck.reason
     });
   } catch (error) {
     next(error);
