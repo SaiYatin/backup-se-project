@@ -1,5 +1,6 @@
 const { Pledge, Event, User } = require('../models');
 const { auditLog } = require('../utils/logger');
+const { checkAndUpdateEventStatus } = require('../services/eventStatusService');
 // Create Pledge
 exports.createPledge = async (req, res, next) => {
   try {
@@ -42,6 +43,9 @@ exports.createPledge = async (req, res, next) => {
       current_amount: parseFloat(event.current_amount || 0) + numericAmount
     });
 
+    // Check if event has reached its target and auto-complete if needed
+    const statusCheck = await checkAndUpdateEventStatus(event_id);
+    
     // Fetch pledge with related data
     const pledgeWithDetails = await Pledge.findByPk(pledge.id, {
       include: [
@@ -53,7 +57,7 @@ exports.createPledge = async (req, res, next) => {
         {
           model: Event,
           as: 'event',
-          attributes: ['id', 'title', 'target_amount', 'current_amount']
+          attributes: ['id', 'title', 'target_amount', 'current_amount', 'status']
         }
       ]
     });
@@ -65,10 +69,17 @@ exports.createPledge = async (req, res, next) => {
       payment_status: 'pending'
     });
 
+    // Prepare response message
+    let responseMessage = 'Pledge created successfully';
+    if (statusCheck.updated) {
+      responseMessage += ` - Congratulations! The event "${event.title}" has reached its target and is now completed! 🎉`;
+    }
+
     res.status(201).json({
       success: true,
-      message: 'Pledge created successfully',
-      data: pledgeWithDetails
+      message: responseMessage,
+      data: pledgeWithDetails,
+      eventStatusUpdated: statusCheck.updated
     });
   } catch (error) {
     next(error);
