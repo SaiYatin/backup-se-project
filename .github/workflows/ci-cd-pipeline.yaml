@@ -67,10 +67,10 @@ jobs:
           path: backend/lint_report.txt
 
   # ---------------------------
-  # 3️⃣ TEST + COVERAGE STAGE
+  # 3️⃣ TEST + COVERAGE STAGE (UNIT TESTS)
   # ---------------------------
-  test:
-    name: Run Tests with Coverage
+  test-unit:
+    name: Run Unit Tests
     runs-on: ubuntu-latest
     needs: lint
     defaults:
@@ -88,25 +88,124 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Run Tests with Coverage
+      - name: Run Unit Tests
         env:
           NODE_ENV: test
-        run: npm test -- --coverage
+        run: npm run test:unit
+
+      - name: Upload Unit Test Coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-coverage-report
+          path: backend/coverage
+
+  # ---------------------------
+  # 3B️⃣ TEST + COVERAGE STAGE (INTEGRATION TESTS)
+  # ---------------------------
+  test-integration:
+    name: Run Integration Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Integration Tests
+        env:
+          NODE_ENV: test
+        run: npm run test:integration
+
+      - name: Upload Integration Test Coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-coverage-report
+          path: backend/coverage
+
+  # ---------------------------
+  # 3C️⃣ TEST + COVERAGE STAGE (SYSTEM TESTS)
+  # ---------------------------
+  test-system:
+    name: Run System Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run System Tests
+        env:
+          NODE_ENV: test
+        run: npm run test:system
+
+      - name: Upload System Test Coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: system-coverage-report
+          path: backend/coverage
+
+  # ---------------------------
+  # 3D️⃣ COVERAGE VALIDATION
+  # ---------------------------
+  test-coverage:
+    name: Validate Coverage Threshold
+    runs-on: ubuntu-latest
+    needs: [test-unit, test-integration, test-system]
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run All Tests with Coverage
+        env:
+          NODE_ENV: test
+        run: npm test
 
       - name: Enforce Coverage >= 75%
         run: |
           COVERAGE=$(node -pe "require('./coverage/coverage-summary.json').total.lines.pct")
-          echo "Total coverage: $COVERAGE%"
+          echo "📊 Total Code Coverage: $COVERAGE%"
           if (( $(echo "$COVERAGE < 75" | bc -l) )); then
             echo "❌ Coverage below 75% threshold"
             exit 1
           fi
-          echo "✅ Coverage requirement met"
+          echo "✅ Coverage requirement met (>= 75%)"
 
-      - name: Upload Coverage Report
+      - name: Upload Final Coverage Report
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
+          name: final-coverage-report
           path: backend/coverage
 
   # ---------------------------
@@ -115,7 +214,7 @@ jobs:
   security:
     name: Security Analysis
     runs-on: ubuntu-latest
-    needs: test
+    needs: test-coverage
     defaults:
       run:
         working-directory: backend

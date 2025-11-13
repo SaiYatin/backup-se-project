@@ -29,7 +29,12 @@ const sequelize = new Sequelize(database, user, password, {
 
 sequelize
   .authenticate()
-  .then(() => console.log('✅ Database connection established successfully'))
-  .catch((err) => console.error('❌ Database connection failed:', err));
+  .then(() => {
+    // Avoid noisy console output during tests — Jest complains if async logs happen after tests finish
+    if (!isTest) console.log('✅ Database connection established successfully');
+  })
+  .catch((err) => {
+    if (!isTest) console.error('❌ Database connection failed:', err);
+  });
 
 module.exports = { sequelize };

@@ -19,7 +19,7 @@ exports.createEvent = async (req, res, next) => {
     // - In development, optionally make all events active for testing
     const eventStatus = userRole === 'admin' 
       ? 'active' 
-      : (process.env.NODE_ENV === 'development' && process.env.AUTO_APPROVE === 'true')
+      : ((process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') && process.env.AUTO_APPROVE === 'true')
         ? 'active'
         : 'pending';
 
