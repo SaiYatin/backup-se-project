@@ -72,14 +72,19 @@ exports.createPledge = async (req, res, next) => {
     // Prepare response message
     let responseMessage = 'Pledge created successfully';
     if (statusCheck.updated) {
-      responseMessage += ` - Congratulations! The event "${event.title}" has reached its target and is now completed! 🎉`;
+      if (statusCheck.reason === 'target_reached') {
+        responseMessage += ` - Congratulations! The event "${event.title}" has reached its target and is now completed! 🎉`;
+      } else if (statusCheck.reason === 'time_expired') {
+        responseMessage += ` - The event "${event.title}" has ended (time expired) and is now completed.`;
+      }
     }
 
     res.status(201).json({
       success: true,
       message: responseMessage,
       data: pledgeWithDetails,
-      eventStatusUpdated: statusCheck.updated
+      eventStatusUpdated: statusCheck.updated,
+      completionReason: statusCheck.reason
     });
   } catch (error) {
     next(error);
