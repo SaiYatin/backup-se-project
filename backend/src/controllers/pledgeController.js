@@ -4,7 +4,7 @@ const { checkAndUpdateEventStatus } = require('../services/eventStatusService');
 // Create Pledge
 exports.createPledge = async (req, res, next) => {
   try {
-    const { event_id, amount, message } = req.body;
+    const { event_id, amount, message, is_anonymous } = req.body;
 
     // Check if event exists and is approved
     const event = await Event.findByPk(event_id);
@@ -47,6 +47,7 @@ exports.createPledge = async (req, res, next) => {
       donor_id: req.user.id,
       amount: numericAmount,
       message: message || '',
+      is_anonymous: !!is_anonymous,
       payment_status: 'pending'
     });
 
@@ -74,10 +75,16 @@ exports.createPledge = async (req, res, next) => {
       ]
     });
 
+    // Hide donor info if anonymous
+    if (pledge.is_anonymous && pledgeWithDetails?.donor) {
+      pledgeWithDetails.donor = null;
+    }
+
     // Log pledge creation
     auditLog.create('Pledge', pledge.id, req.user.id, {
       event_id: event.id,
-      amount: amount,
+      amount: numericAmount,
+      is_anonymous: !!is_anonymous,
       payment_status: 'pending'
     });
 
