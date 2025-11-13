@@ -90,16 +90,21 @@ const EventDetail = () => {
       const rawEvent = eventResp.data;
       setEvent(normalizeEventFromApi(rawEvent));
 
-      const normalizedPledges: Pledge[] = (pledgeResp.data || []).map((p: any) => ({
-        id: p.id,
-        eventId: p.event_id ?? p.eventId,
-        userId: p.donor_id ?? p.userId,
-        userName: p.donor?.name ?? p.userName,
-        amount: Number(p.amount) || 0,
-        isAnonymous: !!p.is_anonymous,
-        message: p.message,
-        createdAt: p.created_at ?? p.createdAt,
-      }));
+ const normalizedPledges: Pledge[] = (pledgeResp.data || []).map((p: any) => {
+  const isAnon = !!p.is_anonymous;
+
+  return {
+    id: p.id,
+    eventId: p.event_id ?? p.eventId,
+    userId: p.donor_id ?? p.userId,
+    userName: isAnon ? null : (p.donor?.name ?? p.userName),
+    amount: Number(p.amount) || 0,
+    isAnonymous: isAnon,
+    message: p.message,
+    createdAt: p.created_at ?? p.createdAt,
+  };
+});
+
 
       setPledges(normalizedPledges);
     } catch (err) {
@@ -117,23 +122,28 @@ const EventDetail = () => {
       return { ...prev, currentAmount: updated, current_amount: updated };
     });
 
-    if (newPledge) {
-      const normalized: Pledge = {
-        id: newPledge.id,
-        eventId: newPledge.event_id ?? newPledge.eventId,
-        userId: newPledge.donor_id ?? newPledge.userId,
-        userName: newPledge.donor?.name ?? newPledge.userName ?? 'Supporter',
-        amount: Number(newPledge.amount ?? 0),
-        isAnonymous: !!newPledge.is_anonymous,
-        message: newPledge.message ?? '',
-        createdAt: newPledge.created_at ?? newPledge.createdAt ?? new Date().toISOString(),
-      };
-      setPledges((prev) => [normalized, ...prev]);
-    }
+if (newPledge) {
+  const isAnon = !!newPledge.is_anonymous;
+
+  const normalized: Pledge = {
+    id: newPledge.id,
+    eventId: newPledge.event_id ?? newPledge.eventId,
+    userId: newPledge.donor_id ?? newPledge.userId,
+    userName: isAnon ? null : (newPledge.donor?.name ?? newPledge.userName),
+    amount: Number(newPledge.amount ?? 0),
+    isAnonymous: isAnon,
+    message: newPledge.message ?? "",
+    createdAt: newPledge.created_at ?? newPledge.createdAt ?? new Date().toISOString(),
+  };
+
+  setPledges(prev => [normalized, ...prev]);
+}
+
 
     try {
+      // Refresh to get updated status (in case event was completed)
       await new Promise((resolve) => setTimeout(resolve, 1200));
-      await loadPledges();
+      await Promise.all([loadEventDetails(), loadPledges()]);
     } catch (err) {
       console.warn('Refresh failed:', err);
     }
@@ -195,6 +205,11 @@ const EventDetail = () => {
                 <Badge className="absolute top-4 right-4 bg-background/90 backdrop-blur-sm">
                   {event.category}
                 </Badge>
+                {event.status === 'completed' && (
+                  <Badge className="absolute top-4 left-4 bg-green-500 text-white text-lg px-4 py-2">
+                    ✓ Goal Reached!
+                  </Badge>
+                )}
               </div>
 
               <div className="p-8 space-y-6">
@@ -308,12 +323,26 @@ const EventDetail = () => {
               </Button>
             </div>
 
-            <PledgeForm
-              eventId={event.id}
-              onSuccess={(amount?: number, newPledge?: any) =>
-                handlePledgeSuccess(Number(amount ?? 0), newPledge)
-              }
-            />
+            {event.status === 'completed' ? (
+              <div className="bg-card rounded-lg p-6 shadow-card">
+                <div className="text-center space-y-4">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                    <span className="text-3xl">🎉</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-green-600">Goal Reached!</h3>
+                  <p className="text-muted-foreground">
+                    This event has successfully reached its fundraising goal. Thank you to all supporters!
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <PledgeForm
+                eventId={event.id}
+                onSuccess={(amount?: number, newPledge?: any) =>
+                  handlePledgeSuccess(Number(amount ?? 0), newPledge)
+                }
+              />
+            )}
           </div>
         </div>
       </div>

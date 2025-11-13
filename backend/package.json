@@ -11,7 +11,9 @@
     "test:unit": "cross-env NODE_ENV=test jest src/tests/unit --coverage --detectOpenHandles --forceExit",
     "test:integration": "cross-env NODE_ENV=test jest src/tests/integration --coverage --detectOpenHandles --forceExit",
     "test:system": "cross-env NODE_ENV=test jest src/tests/system --coverage --detectOpenHandles --forceExit",
-    "test:watch": "cross-env NODE_ENV=test jest --watch"
+    "test:watch": "cross-env NODE_ENV=test jest --watch",
+    "test:no-coverage": "cross-env NODE_ENV=test jest --detectOpenHandles --forceExit",
+    "check-expired": "node src/scripts/check-expired-events.js"
   },
   "keywords": [
     "fundraising",

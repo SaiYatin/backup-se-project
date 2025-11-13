@@ -1,13 +1,14 @@
 const { Pledge, Event, User } = require('../models');
 const { auditLog } = require('../utils/logger');
+const { checkAndUpdateEventStatus } = require('../services/eventStatusService');
 // Create Pledge
 exports.createPledge = async (req, res, next) => {
   try {
-    const { event_id, amount, message } = req.body;
+    const { event_id, amount, message, is_anonymous } = req.body;
 
-    // Check if event exists and is approved
+    // 1. Validate event
     const event = await Event.findByPk(event_id);
-    
+
     if (!event) {
       return res.status(404).json({
         success: false,
@@ -15,33 +16,52 @@ exports.createPledge = async (req, res, next) => {
       });
     }
 
+    // Check if event has expired and auto-complete if needed
+    const statusCheck = await checkAndUpdateEventStatus(event_id);
+    
+    // Reload event to get updated status
+    await event.reload();
+
     if (event.status !== 'active') {
+      const reason = statusCheck.reason === 'time_expired' 
+        ? 'This event has ended (time expired)'
+        : 'Cannot pledge to inactive events';
+      
       return res.status(400).json({
         success: false,
-        error: 'Cannot pledge to inactive events'
+        error: reason,
+        eventStatus: event.status,
+        completionReason: statusCheck.reason
       });
     }
 
-    // Ensure numeric arithmetic for DECIMAL fields
+    // 2. Validate amount
     const numericAmount = parseFloat(amount);
     if (Number.isNaN(numericAmount) || numericAmount <= 0) {
-      return res.status(400).json({ success: false, error: 'Invalid pledge amount' });
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid pledge amount'
+      });
     }
 
-    // Create pledge with Sequelize
+    // 3. Create pledge (NOW INCLUDES is_anonymous)
     const pledge = await Pledge.create({
       event_id,
       donor_id: req.user.id,
       amount: numericAmount,
       message: message || '',
+      is_anonymous: !!is_anonymous,
       payment_status: 'pending'
     });
 
-    // Update event's current_amount (parse DECIMAL strings to numbers)
+    // 4. Update event total
     await event.update({
       current_amount: parseFloat(event.current_amount || 0) + numericAmount
     });
 
+    // Check again if event has reached its target after pledge
+    const postPledgeCheck = await checkAndUpdateEventStatus(event_id);
+    
     // Fetch pledge with related data
     const pledgeWithDetails = await Pledge.findByPk(pledge.id, {
       include: [
@@ -53,27 +73,49 @@ exports.createPledge = async (req, res, next) => {
         {
           model: Event,
           as: 'event',
-          attributes: ['id', 'title', 'target_amount', 'current_amount']
+          attributes: ['id', 'title', 'target_amount', 'current_amount', 'status']
         }
       ]
     });
 
+    // Hide donor info if anonymous
+    if (pledge.is_anonymous && pledgeWithDetails?.donor) {
+      pledgeWithDetails.donor = null;
+    }
+
     // Log pledge creation
     auditLog.create('Pledge', pledge.id, req.user.id, {
       event_id: event.id,
-      amount: amount,
+      amount: numericAmount,
+      is_anonymous: !!is_anonymous,
       payment_status: 'pending'
     });
 
+
+    // Prepare response message
+    let responseMessage = 'Pledge created successfully';
+    if (postPledgeCheck.updated) {
+      if (postPledgeCheck.reason === 'target_reached') {
+        responseMessage += ` - Congratulations! The event "${event.title}" has reached its target and is now completed! 🎉`;
+      } else if (postPledgeCheck.reason === 'time_expired') {
+        responseMessage += ` - The event "${event.title}" has ended (time expired) and is now completed.`;
+      }
+    }
+
     res.status(201).json({
+
       success: true,
-      message: 'Pledge created successfully',
-      data: pledgeWithDetails
+      message: responseMessage,
+      data: pledgeWithDetails,
+      eventStatusUpdated: postPledgeCheck.updated,
+      completionReason: postPledgeCheck.reason
     });
+
   } catch (error) {
     next(error);
   }
 };
+
 
 // Get All Pledges (Admin or specific filters)
 exports.getAllPledges = async (req, res, next) => {
