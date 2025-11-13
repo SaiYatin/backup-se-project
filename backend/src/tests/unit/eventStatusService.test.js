@@ -61,13 +61,17 @@ describe('Event Status Service', () => {
       expect(result.targetAmount).toBe(1000);
     });
 
-    it('should not update status when target is not reached', async () => {
+    it('should not update status when target is not reached and not expired', async () => {
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 7); // 7 days in future
+
       const mockEvent = {
         id: 'event-3',
         title: 'Test Event 3',
         status: 'active',
         current_amount: '500.00',
         target_amount: '1000.00',
+        end_date: futureDate,
         update: jest.fn()
       };
 
@@ -77,7 +81,54 @@ describe('Event Status Service', () => {
 
       expect(result.updated).toBe(false);
       expect(mockEvent.update).not.toHaveBeenCalled();
-      expect(result.message).toBe('Target not yet reached');
+      expect(result.message).toContain('not yet reached');
+    });
+
+    it('should update event status when end date has passed', async () => {
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - 1); // 1 day ago
+
+      const mockEvent = {
+        id: 'event-expired',
+        title: 'Expired Event',
+        status: 'active',
+        current_amount: '500.00',
+        target_amount: '1000.00',
+        end_date: pastDate,
+        update: jest.fn().mockResolvedValue(true)
+      };
+
+      Event.findByPk.mockResolvedValue(mockEvent);
+
+      const result = await checkAndUpdateEventStatus('event-expired');
+
+      expect(result.updated).toBe(true);
+      expect(result.reason).toBe('time_expired');
+      expect(mockEvent.update).toHaveBeenCalledWith({ status: 'completed' });
+      expect(result.message).toContain('end date passed');
+    });
+
+    it('should prioritize target reached over time expired', async () => {
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - 1);
+
+      const mockEvent = {
+        id: 'event-both',
+        title: 'Event Both Conditions',
+        status: 'active',
+        current_amount: '1000.00',
+        target_amount: '1000.00',
+        end_date: pastDate,
+        update: jest.fn().mockResolvedValue(true)
+      };
+
+      Event.findByPk.mockResolvedValue(mockEvent);
+
+      const result = await checkAndUpdateEventStatus('event-both');
+
+      expect(result.updated).toBe(true);
+      expect(result.reason).toBe('target_reached');
+      expect(result.message).toContain('target of');
     });
 
     it('should not update status for non-active events', async () => {
@@ -224,6 +275,45 @@ describe('Event Status Service', () => {
 
       const Event = require('../../models/Event');
       const result = Event.prototype.hasReachedTarget.call(event);
+
+      expect(result).toBe(false);
+    });
+
+    it('hasExpired should return true when end date has passed', () => {
+      const pastDate = new Date();
+      pastDate.setDate(pastDate.getDate() - 1);
+
+      const event = {
+        end_date: pastDate
+      };
+
+      const Event = require('../../models/Event');
+      const result = Event.prototype.hasExpired.call(event);
+
+      expect(result).toBe(true);
+    });
+
+    it('hasExpired should return false when end date is in future', () => {
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 7);
+
+      const event = {
+        end_date: futureDate
+      };
+
+      const Event = require('../../models/Event');
+      const result = Event.prototype.hasExpired.call(event);
+
+      expect(result).toBe(false);
+    });
+
+    it('hasExpired should return false when no end date is set', () => {
+      const event = {
+        end_date: null
+      };
+
+      const Event = require('../../models/Event');
+      const result = Event.prototype.hasExpired.call(event);
 
       expect(result).toBe(false);
     });

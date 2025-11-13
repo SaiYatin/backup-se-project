@@ -16,10 +16,22 @@ exports.createPledge = async (req, res, next) => {
       });
     }
 
+    // Check if event has expired and auto-complete if needed
+    const statusCheck = await checkAndUpdateEventStatus(event_id);
+    
+    // Reload event to get updated status
+    await event.reload();
+
     if (event.status !== 'active') {
+      const reason = statusCheck.reason === 'time_expired' 
+        ? 'This event has ended (time expired)'
+        : 'Cannot pledge to inactive events';
+      
       return res.status(400).json({
         success: false,
-        error: 'Cannot pledge to inactive events'
+        error: reason,
+        eventStatus: event.status,
+        completionReason: statusCheck.reason
       });
     }
 
@@ -38,7 +50,7 @@ exports.createPledge = async (req, res, next) => {
       donor_id: req.user.id,
       amount: numericAmount,
       message: message || '',
-      is_anonymous: !!is_anonymous, // <- 🔥 FIXED HERE
+      is_anonymous: !!is_anonymous,
       payment_status: 'pending'
     });
 
@@ -47,9 +59,8 @@ exports.createPledge = async (req, res, next) => {
       current_amount: parseFloat(event.current_amount || 0) + numericAmount
     });
 
-
-    // Check if event has reached its target and auto-complete if needed
-    const statusCheck = await checkAndUpdateEventStatus(event_id);
+    // Check again if event has reached its target after pledge
+    const postPledgeCheck = await checkAndUpdateEventStatus(event_id);
     
     // Fetch pledge with related data
     const pledgeWithDetails = await Pledge.findByPk(pledge.id, {
@@ -67,12 +78,12 @@ exports.createPledge = async (req, res, next) => {
       ]
     });
 
-    // 6. Hide donor info if anonymous (IMPORTANT)
+    // Hide donor info if anonymous
     if (pledge.is_anonymous && pledgeWithDetails?.donor) {
       pledgeWithDetails.donor = null;
     }
 
-    // 7. Log
+    // Log pledge creation
     auditLog.create('Pledge', pledge.id, req.user.id, {
       event_id: event.id,
       amount: numericAmount,
@@ -83,8 +94,12 @@ exports.createPledge = async (req, res, next) => {
 
     // Prepare response message
     let responseMessage = 'Pledge created successfully';
-    if (statusCheck.updated) {
-      responseMessage += ` - Congratulations! The event "${event.title}" has reached its target and is now completed! 🎉`;
+    if (postPledgeCheck.updated) {
+      if (postPledgeCheck.reason === 'target_reached') {
+        responseMessage += ` - Congratulations! The event "${event.title}" has reached its target and is now completed! 🎉`;
+      } else if (postPledgeCheck.reason === 'time_expired') {
+        responseMessage += ` - The event "${event.title}" has ended (time expired) and is now completed.`;
+      }
     }
 
     res.status(201).json({
@@ -92,7 +107,8 @@ exports.createPledge = async (req, res, next) => {
       success: true,
       message: responseMessage,
       data: pledgeWithDetails,
-      eventStatusUpdated: statusCheck.updated
+      eventStatusUpdated: postPledgeCheck.updated,
+      completionReason: postPledgeCheck.reason
     });
 
   } catch (error) {

@@ -53,6 +53,24 @@ npm run test:coverage    # With coverage
 npm test -- --watch      # Watch mode
 ```
 
+## Maintenance Scripts
+
+### Check Expired Events
+Automatically mark events as completed when their end date has passed or target is reached:
+
+```bash
+npm run check-expired
+```
+
+This script will:
+- Check all active events
+- Mark events as completed if:
+  - Target amount has been reached, OR
+  - End date has passed
+- Log summary of updates
+
+**Recommended:** Run this script periodically (e.g., via cron job) to keep event statuses up-to-date.
+
 ## Project Structure
 ```
 backend/
