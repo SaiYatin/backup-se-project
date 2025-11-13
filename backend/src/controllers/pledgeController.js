@@ -6,9 +6,9 @@ exports.createPledge = async (req, res, next) => {
   try {
     const { event_id, amount, message, is_anonymous } = req.body;
 
-    // Check if event exists and is approved
+    // 1. Validate event
     const event = await Event.findByPk(event_id);
-    
+
     if (!event) {
       return res.status(404).json({
         success: false,
@@ -35,13 +35,16 @@ exports.createPledge = async (req, res, next) => {
       });
     }
 
-    // Ensure numeric arithmetic for DECIMAL fields
+    // 2. Validate amount
     const numericAmount = parseFloat(amount);
     if (Number.isNaN(numericAmount) || numericAmount <= 0) {
-      return res.status(400).json({ success: false, error: 'Invalid pledge amount' });
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid pledge amount'
+      });
     }
 
-    // Create pledge with Sequelize
+    // 3. Create pledge (NOW INCLUDES is_anonymous)
     const pledge = await Pledge.create({
       event_id,
       donor_id: req.user.id,
@@ -51,7 +54,7 @@ exports.createPledge = async (req, res, next) => {
       payment_status: 'pending'
     });
 
-    // Update event's current_amount (parse DECIMAL strings to numbers)
+    // 4. Update event total
     await event.update({
       current_amount: parseFloat(event.current_amount || 0) + numericAmount
     });
@@ -88,6 +91,7 @@ exports.createPledge = async (req, res, next) => {
       payment_status: 'pending'
     });
 
+
     // Prepare response message
     let responseMessage = 'Pledge created successfully';
     if (postPledgeCheck.updated) {
@@ -99,16 +103,19 @@ exports.createPledge = async (req, res, next) => {
     }
 
     res.status(201).json({
+
       success: true,
       message: responseMessage,
       data: pledgeWithDetails,
       eventStatusUpdated: postPledgeCheck.updated,
       completionReason: postPledgeCheck.reason
     });
+
   } catch (error) {
     next(error);
   }
 };
+
 
 // Get All Pledges (Admin or specific filters)
 exports.getAllPledges = async (req, res, next) => {
