@@ -55,14 +55,22 @@ const PledgeForm = ({ eventId, onSuccess }: PledgeFormProps) => {
 
     setLoading(true);
     try {
-      await pledgeService.submitPledge({
+      const response = await pledgeService.submitPledge({
         eventId,
         amount: data.amount,
         isAnonymous: data.isAnonymous,
         message: data.message,
       });
 
-      toast.success('Pledge submitted successfully! 🎉');
+      // Check if the event was auto-completed due to reaching target
+      if (response.data?.eventStatusUpdated) {
+        toast.success('🎉 Amazing! Your pledge helped this event reach its goal! The event is now completed!', {
+          duration: 5000,
+        });
+      } else {
+        toast.success('Pledge submitted successfully! 🎉');
+      }
+      
       form.reset();
       onSuccess?.();
     } catch (error: any) {
