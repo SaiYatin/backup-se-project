@@ -7,12 +7,12 @@ const Dashboard = () => {
   const { user } = useAuth();
 
   return (
-    <div className="min-h-screen bg-gradient-subtle py-12">
+    <div className="min-h-screen bg-gradient-subtle py-8 sm:py-12">
       <div className="container mx-auto px-4">
-        <div className="max-w-6xl mx-auto space-y-8">
-          <div className="flex items-center justify-between">
+        <div className="max-w-6xl mx-auto space-y-6 sm:space-y-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-4xl font-bold mb-2">Welcome back, {user?.name}!</h1>
+              <h1 className="text-3xl sm:text-4xl font-bold mb-2">Welcome back, {user?.name}!</h1>
               <p className="text-lg text-muted-foreground">
                 Here's an overview of your fundraising activity
               </p>
@@ -22,7 +22,7 @@ const Dashboard = () => {
             </Badge>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             <Card className="shadow-card hover:shadow-card-hover transition-all">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Pledges</CardTitle>

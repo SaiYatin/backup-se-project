@@ -100,7 +100,7 @@ const CreateEvent = () => {
           </Link>
 
           <div className="text-center space-y-2">
-            <h1 className="text-4xl font-bold">Create New Event</h1>
+            <h1 className="text-3xl sm:text-4xl font-bold">Create New Event</h1>
             <p className="text-lg text-muted-foreground">
               Start your fundraising journey and make a difference
             </p>
@@ -251,11 +251,11 @@ const CreateEvent = () => {
                     )}
                   />
 
-                  <div className="flex gap-3 pt-4">
+                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
                     <Button
                       type="submit"
                       variant="hero"
-                      className="flex-1 gap-2"
+                      className="flex-1 gap-2 w-full"
                       size="lg"
                       disabled={loading}
                     >
@@ -266,6 +266,7 @@ const CreateEvent = () => {
                       type="button"
                       variant="outline"
                       size="lg"
+                      className="w-full sm:w-auto"
                       onClick={() => navigate('/dashboard')}
                     >
                       Cancel

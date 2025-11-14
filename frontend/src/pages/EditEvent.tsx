@@ -169,7 +169,7 @@ const EditEvent = () => {
       <div className="container mx-auto px-4">
         <div className="max-w-3xl mx-auto space-y-6">
           {/* Header */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <Link to={`/events/${id}`}>
               <Button variant="ghost" className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
@@ -179,9 +179,10 @@ const EditEvent = () => {
             
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive" className="gap-2">
+                <Button variant="destructive" className="gap-2 w-full sm:w-auto">
                   <Trash2 className="h-4 w-4" />
-                  Delete Event
+                  <span className="hidden sm:inline">Delete Event</span>
+                  <span className="sm:hidden">Delete</span>
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
@@ -326,11 +327,11 @@ const EditEvent = () => {
                     )}
                   />
 
-                  <div className="flex gap-3 pt-4">
+                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
                     <Button
                       type="submit"
                       variant="hero"
-                      className="flex-1 gap-2"
+                      className="flex-1 gap-2 w-full"
                       disabled={saving}
                     >
                       <Save className="h-4 w-4" />
@@ -339,6 +340,7 @@ const EditEvent = () => {
                     <Button
                       type="button"
                       variant="outline"
+                      className="w-full sm:w-auto"
                       onClick={() => navigate(`/events/${id}`)}
                     >
                       Cancel

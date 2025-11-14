@@ -72,8 +72,9 @@ const Events = () => {
           </div>
 
           {/* 🔍 Search and Filters */}
-          <div className="flex flex-col md:flex-row gap-3 md:gap-4 max-w-4xl mx-auto items-center justify-center">
-            <div className="flex flex-1 gap-2 w-full">
+          <div className="flex flex-col gap-3 max-w-4xl mx-auto">
+            {/* Search Bar */}
+            <div className="flex gap-2 w-full">
               <Input
                 type="text"
                 placeholder="Search events..."
@@ -84,39 +85,41 @@ const Events = () => {
               />
               <Button onClick={handleSearch} variant="hero" className="gap-2">
                 <Search className="h-4 w-4" />
-                Search
+                <span className="hidden sm:inline">Search</span>
               </Button>
             </div>
 
-            {/* 🧭 Category filter */}
-<Select onValueChange={(val) => setCategory(val === 'all' ? '' : val)} value={category || 'all'}>
-  <SelectTrigger className="w-[180px]">
-    <Filter className="h-4 w-4 mr-2" />
-    {category ? category : 'Category'}
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="all">All Categories</SelectItem>
-    <SelectItem value="Education">Education</SelectItem>
-    <SelectItem value="Healthcare">Healthcare</SelectItem>
-    <SelectItem value="Environment">Environment</SelectItem>
-    <SelectItem value="Sports">Sports</SelectItem>
-    <SelectItem value="Community">Community</SelectItem>
-  </SelectContent>
-</Select>
+            {/* Filter Row */}
+            <div className="flex gap-2 w-full">
+              {/* 🧭 Category filter */}
+              <Select onValueChange={(val) => setCategory(val === 'all' ? '' : val)} value={category || 'all'}>
+                <SelectTrigger className="flex-1 sm:flex-none sm:w-[180px]">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <span className="truncate">{category ? category : 'Category'}</span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="Education">Education</SelectItem>
+                  <SelectItem value="Healthcare">Healthcare</SelectItem>
+                  <SelectItem value="Environment">Environment</SelectItem>
+                  <SelectItem value="Sports">Sports</SelectItem>
+                  <SelectItem value="Community">Community</SelectItem>
+                </SelectContent>
+              </Select>
 
-{/* ⚙️ Status filter */}
-<Select onValueChange={(val) => setStatus(val === 'all' ? '' : val)} value={status || 'all'}>
-  <SelectTrigger className="w-[160px]">
-    {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Status'}
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="all">All Statuses</SelectItem>
-    <SelectItem value="active">Active</SelectItem>
-    <SelectItem value="pending">Pending</SelectItem>
-    <SelectItem value="completed">Completed</SelectItem>
-  </SelectContent>
-</Select>
-
+              {/* ⚙️ Status filter */}
+              <Select onValueChange={(val) => setStatus(val === 'all' ? '' : val)} value={status || 'all'}>
+                <SelectTrigger className="flex-1 sm:flex-none sm:w-[160px]">
+                  <span className="truncate">{status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Status'}</span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* 🧾 Results */}

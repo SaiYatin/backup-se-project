@@ -76,7 +76,7 @@ const Register = () => {
               <Heart className="h-8 w-8 text-primary-foreground" fill="currentColor" />
             </div>
           </div>
-          <CardTitle className="text-2xl text-center">Create Account</CardTitle>
+          <CardTitle className="text-xl sm:text-2xl text-center">Create Account</CardTitle>
           <CardDescription className="text-center">
             Join our community of changemakers
           </CardDescription>

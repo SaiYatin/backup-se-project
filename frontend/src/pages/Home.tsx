@@ -6,7 +6,7 @@ const Home = () => {
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
-      <section className="relative py-20 md:py-32 bg-gradient-subtle overflow-hidden">
+      <section className="relative py-12 sm:py-20 md:py-32 bg-gradient-subtle overflow-hidden">
         <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto text-center space-y-8 animate-fade-in">
@@ -36,7 +36,7 @@ const Home = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-background">
+      <section className="py-12 sm:py-16 md:py-20 bg-background">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Why Choose FundRaise?</h2>
@@ -91,7 +91,7 @@ const Home = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-hero text-primary-foreground">
+      <section className="py-12 sm:py-16 md:py-20 bg-gradient-hero text-primary-foreground">
         <div className="container mx-auto px-4 text-center space-y-8">
           <h2 className="text-3xl md:text-5xl font-bold">Ready to Make a Difference?</h2>
           <p className="text-xl opacity-90 max-w-2xl mx-auto">
