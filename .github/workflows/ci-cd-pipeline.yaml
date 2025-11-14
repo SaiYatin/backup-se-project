@@ -8,7 +8,7 @@ on:
 
 jobs:
   # ---------------------------
-  # 1️⃣ BUILD STAGE
+  # 1ï¸âƒ£ BUILD STAGE
   # ---------------------------
   build:
     name: Build Application
@@ -40,11 +40,11 @@ jobs:
           echo "        BUILD STAGE REPORT           " >> build_report.txt
           echo "=====================================" >> build_report.txt
           echo "" >> build_report.txt
-          echo "Status: ✅ SUCCESS" >> build_report.txt
+          echo "Status: âœ… SUCCESS" >> build_report.txt
           echo "Node Version: $(node -v)" >> build_report.txt
           echo "NPM Version: $(npm -v)" >> build_report.txt
           echo "Build Date: $(date)" >> build_report.txt
-          echo "Dependencies Installed: ✅" >> build_report.txt
+          echo "Dependencies Installed: âœ…" >> build_report.txt
           echo "" >> build_report.txt
           echo "=====================================" >> build_report.txt
 
@@ -55,7 +55,7 @@ jobs:
           path: backend/build_report.txt
 
   # ---------------------------
-  # 2️⃣ TEST STAGE (Separate from Coverage)
+  # 2ï¸âƒ£ TEST STAGE (Separate from Coverage)
   # ---------------------------
   test:
     name: Run All Tests
@@ -65,31 +65,9 @@ jobs:
       run:
         working-directory: backend
 
-    services:
-      postgres:
-        image: postgres:14
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: testdb
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    env:
-      NODE_ENV: test
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/testdb
-      JWT_SECRET: testsecret
-      JWT_EXPIRE: 7d
-      FRONTEND_URL: http://localhost:5173
-
     steps:
       - uses: actions/checkout@v4
-        
+      
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -100,10 +78,13 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Run Migrations
-        run: npx sequelize-cli db:migrate
-
       - name: Run All Tests (Unit + Integration + System)
+        env:
+          NODE_ENV: test
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_EXPIRE: ${{ secrets.JWT_EXPIRE }}
+          FRONTEND_URL: http://localhost:5173
         run: npm test
 
       - name: Generate Test Report
@@ -113,18 +94,28 @@ jobs:
           echo "         TEST STAGE REPORT           " >> test_report.txt
           echo "=====================================" >> test_report.txt
           echo "" >> test_report.txt
+          echo "Status: âœ… ALL TESTS PASSED" >> test_report.txt
           echo "Test Date: $(date)" >> test_report.txt
+          echo "" >> test_report.txt
+          echo "Test Types Executed:" >> test_report.txt
+          echo "  âœ… Unit Tests" >> test_report.txt
+          echo "  âœ… Integration Tests" >> test_report.txt
+          echo "  âœ… System Tests" >> test_report.txt
+          echo "" >> test_report.txt
+          echo "Note: Detailed coverage metrics are" >> test_report.txt
+          echo "analyzed in the Coverage stage." >> test_report.txt
+          echo "" >> test_report.txt
           echo "=====================================" >> test_report.txt
 
       - name: Upload Test Report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-report
           path: backend/test_report.txt
 
-
   # ---------------------------
-  # 3️⃣ COVERAGE STAGE (Separate from Test)
+  # 3ï¸âƒ£ COVERAGE STAGE (Separate from Test)
   # ---------------------------
   coverage:
     name: Code Coverage Analysis
@@ -134,31 +125,9 @@ jobs:
       run:
         working-directory: backend
 
-    services:
-      postgres:
-        image: postgres:14
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: testdb
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    env:
-      NODE_ENV: test
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/testdb
-      JWT_SECRET: testsecret
-      JWT_EXPIRE: 7d
-      FRONTEND_URL: http://localhost:5173
-
     steps:
       - uses: actions/checkout@v4
-        
+      
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -170,11 +139,80 @@ jobs:
         run: npm ci
 
       - name: Run Tests with Coverage
+        env:
+          NODE_ENV: test
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_EXPIRE: ${{ secrets.JWT_EXPIRE }}
+          FRONTEND_URL: http://localhost:5173
         run: npm test
 
+      - name: Generate Coverage Report (Lines & Statements Only)
+        if: always()
+        run: |
+          LINES_PCT=$(node -pe "require('./coverage/coverage-summary.json').total.lines.pct")
+          STATEMENTS_PCT=$(node -pe "require('./coverage/coverage-summary.json').total.statements.pct")
+          
+          echo "=====================================" > coverage_report.txt
+          echo "      COVERAGE STAGE REPORT          " >> coverage_report.txt
+          echo "=====================================" >> coverage_report.txt
+          echo "" >> coverage_report.txt
+          echo "ðŸ“Š Code Coverage Metrics:" >> coverage_report.txt
+          echo "" >> coverage_report.txt
+          echo "  Lines Coverage:      ${LINES_PCT}%" >> coverage_report.txt
+          echo "  Statements Coverage: ${STATEMENTS_PCT}%" >> coverage_report.txt
+          echo "" >> coverage_report.txt
+          echo "Threshold Required: â‰¥75%" >> coverage_report.txt
+          echo "" >> coverage_report.txt
+          
+          # Check if coverage meets threshold
+          LINES_FAIL=$(echo "$LINES_PCT < 75" | bc -l)
+          STATEMENTS_FAIL=$(echo "$STATEMENTS_PCT < 75" | bc -l)
+          
+          if [ "$LINES_FAIL" -eq 1 ] || [ "$STATEMENTS_FAIL" -eq 1 ]; then
+            echo "Status: âŒ BELOW THRESHOLD" >> coverage_report.txt
+            echo "" >> coverage_report.txt
+            echo "âš ï¸  Coverage is below required 75%" >> coverage_report.txt
+            echo "   Lines: ${LINES_PCT}%" >> coverage_report.txt
+            echo "   Statements: ${STATEMENTS_PCT}%" >> coverage_report.txt
+          else
+            echo "Status: âœ… PASSED" >> coverage_report.txt
+            echo "" >> coverage_report.txt
+            echo "âœ… Coverage requirement met!" >> coverage_report.txt
+            echo "   Lines: ${LINES_PCT}% (â‰¥75% required)" >> coverage_report.txt
+            echo "   Statements: ${STATEMENTS_PCT}% (â‰¥75% required)" >> coverage_report.txt
+          fi
+          
+          echo "" >> coverage_report.txt
+          echo "Coverage Date: $(date)" >> coverage_report.txt
+          echo "" >> coverage_report.txt
+          echo "=====================================" >> coverage_report.txt
+          
+          # Still enforce the threshold
+          if [ "$LINES_FAIL" -eq 1 ] || [ "$STATEMENTS_FAIL" -eq 1 ]; then
+            echo ""
+            echo "âŒ Coverage below 75% threshold"
+            echo "   Lines: ${LINES_PCT}%"
+            echo "   Statements: ${STATEMENTS_PCT}%"
+            exit 1
+          fi
+
+      - name: Upload Coverage Report (Text)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-summary
+          path: backend/coverage_report.txt
+
+      - name: Upload Full Coverage Report (HTML)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-html
+          path: backend/coverage
 
   # ---------------------------
-  # 4️⃣ LINT STAGE
+  # 4ï¸âƒ£ LINT STAGE
   # ---------------------------
   lint:
     name: Code Quality Analysis (Lint)
@@ -206,7 +244,7 @@ jobs:
           echo "       LINT STAGE REPORT             " >> lint_report.txt
           echo "=====================================" >> lint_report.txt
           echo "" >> lint_report.txt
-          echo "Status: ✅ COMPLETED" >> lint_report.txt
+          echo "Status: âœ… COMPLETED" >> lint_report.txt
           echo "Lint Date: $(date)" >> lint_report.txt
           echo "" >> lint_report.txt
           echo "ESLint Analysis:" >> lint_report.txt
@@ -226,7 +264,7 @@ jobs:
           path: backend/lint_report.txt
 
   # ---------------------------
-  # 5️⃣ SECURITY STAGE
+  # 5ï¸âƒ£ SECURITY STAGE
   # ---------------------------
   security:
     name: Security Vulnerability Scan
@@ -261,7 +299,7 @@ jobs:
           echo "     SECURITY STAGE REPORT           " >> security_report.txt
           echo "=====================================" >> security_report.txt
           echo "" >> security_report.txt
-          echo "Status: ✅ SCAN COMPLETED" >> security_report.txt
+          echo "Status: âœ… SCAN COMPLETED" >> security_report.txt
           echo "Scan Date: $(date)" >> security_report.txt
           echo "" >> security_report.txt
           echo "Security Scan Tool: npm audit" >> security_report.txt
@@ -274,13 +312,13 @@ jobs:
           echo "" >> security_report.txt
           
           if [ "$HIGH" -gt 0 ] || [ "$CRITICAL" -gt 0 ]; then
-            echo "⚠️  Note: High/Critical vulnerabilities detected" >> security_report.txt
+            echo "âš ï¸  Note: High/Critical vulnerabilities detected" >> security_report.txt
             echo "   These are in development dependencies and" >> security_report.txt
             echo "   do not affect production deployment." >> security_report.txt
             echo "" >> security_report.txt
             echo "   Recommended: Run 'npm audit fix' to resolve" >> security_report.txt
           else
-            echo "✅ No high or critical vulnerabilities found" >> security_report.txt
+            echo "âœ… No high or critical vulnerabilities found" >> security_report.txt
           fi
           
           echo "" >> security_report.txt
@@ -289,12 +327,12 @@ jobs:
           # Make this non-blocking - just report the findings
           if [ "$HIGH" -gt 0 ] || [ "$CRITICAL" -gt 0 ]; then
             echo ""
-            echo "⚠️  Security vulnerabilities detected:"
+            echo "âš ï¸  Security vulnerabilities detected:"
             echo "   High: $HIGH, Critical: $CRITICAL"
             echo "   Security report generated - NOT blocking pipeline"
             echo "   Review security_report.json for details"
           else
-            echo "✅ Security scan passed - no critical issues"
+            echo "âœ… Security scan passed - no critical issues"
           fi
 
       - name: Upload Security Report (Text)
@@ -310,7 +348,7 @@ jobs:
           path: backend/security_report.json
 
   # ---------------------------
-  # 6️⃣ DEPLOYMENT ARTIFACT STAGE
+  # 6ï¸âƒ£ DEPLOYMENT ARTIFACT STAGE
   # ---------------------------
   deploy:
     name: Create Deployment Artifact
@@ -391,20 +429,20 @@ jobs:
           echo "Branch: ${{ github.ref_name }}" >> deployment-package/DEPLOYMENT_INFO.txt
           echo "" >> deployment-package/DEPLOYMENT_INFO.txt
           echo "Contents:" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  ✅ Source Code (src/)" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  ✅ Dependencies (package.json, package-lock.json)" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  ✅ Build Report" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  ✅ Test Report" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  ✅ Coverage Report (Summary + HTML)" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  ✅ Lint Report" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  ✅ Security Report (Summary + JSON)" >> deployment-package/DEPLOYMENT_INFO.txt
+          echo "  âœ… Source Code (src/)" >> deployment-package/DEPLOYMENT_INFO.txt
+          echo "  âœ… Dependencies (package.json, package-lock.json)" >> deployment-package/DEPLOYMENT_INFO.txt
+          echo "  âœ… Build Report" >> deployment-package/DEPLOYMENT_INFO.txt
+          echo "  âœ… Test Report" >> deployment-package/DEPLOYMENT_INFO.txt
+          echo "  âœ… Coverage Report (Summary + HTML)" >> deployment-package/DEPLOYMENT_INFO.txt
+          echo "  âœ… Lint Report" >> deployment-package/DEPLOYMENT_INFO.txt
+          echo "  âœ… Security Report (Summary + JSON)" >> deployment-package/DEPLOYMENT_INFO.txt
           echo "" >> deployment-package/DEPLOYMENT_INFO.txt
           echo "Pipeline Stages Completed:" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  1. ✅ Build" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  2. ✅ Test" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  3. ✅ Coverage" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  4. ✅ Lint" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  5. ✅ Security" >> deployment-package/DEPLOYMENT_INFO.txt
+          echo "  1. âœ… Build" >> deployment-package/DEPLOYMENT_INFO.txt
+          echo "  2. âœ… Test" >> deployment-package/DEPLOYMENT_INFO.txt
+          echo "  3. âœ… Coverage" >> deployment-package/DEPLOYMENT_INFO.txt
+          echo "  4. âœ… Lint" >> deployment-package/DEPLOYMENT_INFO.txt
+          echo "  5. âœ… Security" >> deployment-package/DEPLOYMENT_INFO.txt
           echo "" >> deployment-package/DEPLOYMENT_INFO.txt
           echo "=====================================" >> deployment-package/DEPLOYMENT_INFO.txt
           
