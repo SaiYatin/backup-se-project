@@ -65,9 +65,31 @@ jobs:
       run:
         working-directory: backend
 
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/testdb
+      JWT_SECRET: testsecret
+      JWT_EXPIRE: 7d
+      FRONTEND_URL: http://localhost:5173
+
     steps:
       - uses: actions/checkout@v4
-      
+        
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -78,13 +100,10 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Run Migrations
+        run: npx sequelize-cli db:migrate
+
       - name: Run All Tests (Unit + Integration + System)
-        env:
-          NODE_ENV: test
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          JWT_EXPIRE: ${{ secrets.JWT_EXPIRE }}
-          FRONTEND_URL: http://localhost:5173
         run: npm test
 
       - name: Generate Test Report
@@ -94,25 +113,15 @@ jobs:
           echo "         TEST STAGE REPORT           " >> test_report.txt
           echo "=====================================" >> test_report.txt
           echo "" >> test_report.txt
-          echo "Status: ✅ ALL TESTS PASSED" >> test_report.txt
           echo "Test Date: $(date)" >> test_report.txt
-          echo "" >> test_report.txt
-          echo "Test Types Executed:" >> test_report.txt
-          echo "  ✅ Unit Tests" >> test_report.txt
-          echo "  ✅ Integration Tests" >> test_report.txt
-          echo "  ✅ System Tests" >> test_report.txt
-          echo "" >> test_report.txt
-          echo "Note: Detailed coverage metrics are" >> test_report.txt
-          echo "analyzed in the Coverage stage." >> test_report.txt
-          echo "" >> test_report.txt
           echo "=====================================" >> test_report.txt
 
       - name: Upload Test Report
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-report
           path: backend/test_report.txt
+
 
   # ---------------------------
   # 3️⃣ COVERAGE STAGE (Separate from Test)
@@ -125,9 +134,31 @@ jobs:
       run:
         working-directory: backend
 
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/testdb
+      JWT_SECRET: testsecret
+      JWT_EXPIRE: 7d
+      FRONTEND_URL: http://localhost:5173
+
     steps:
       - uses: actions/checkout@v4
-      
+        
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -139,77 +170,8 @@ jobs:
         run: npm ci
 
       - name: Run Tests with Coverage
-        env:
-          NODE_ENV: test
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          JWT_EXPIRE: ${{ secrets.JWT_EXPIRE }}
-          FRONTEND_URL: http://localhost:5173
         run: npm test
 
-      - name: Generate Coverage Report (Lines & Statements Only)
-        if: always()
-        run: |
-          LINES_PCT=$(node -pe "require('./coverage/coverage-summary.json').total.lines.pct")
-          STATEMENTS_PCT=$(node -pe "require('./coverage/coverage-summary.json').total.statements.pct")
-          
-          echo "=====================================" > coverage_report.txt
-          echo "      COVERAGE STAGE REPORT          " >> coverage_report.txt
-          echo "=====================================" >> coverage_report.txt
-          echo "" >> coverage_report.txt
-          echo "📊 Code Coverage Metrics:" >> coverage_report.txt
-          echo "" >> coverage_report.txt
-          echo "  Lines Coverage:      ${LINES_PCT}%" >> coverage_report.txt
-          echo "  Statements Coverage: ${STATEMENTS_PCT}%" >> coverage_report.txt
-          echo "" >> coverage_report.txt
-          echo "Threshold Required: ≥75%" >> coverage_report.txt
-          echo "" >> coverage_report.txt
-          
-          # Check if coverage meets threshold
-          LINES_FAIL=$(echo "$LINES_PCT < 75" | bc -l)
-          STATEMENTS_FAIL=$(echo "$STATEMENTS_PCT < 75" | bc -l)
-          
-          if [ "$LINES_FAIL" -eq 1 ] || [ "$STATEMENTS_FAIL" -eq 1 ]; then
-            echo "Status: ❌ BELOW THRESHOLD" >> coverage_report.txt
-            echo "" >> coverage_report.txt
-            echo "⚠️  Coverage is below required 75%" >> coverage_report.txt
-            echo "   Lines: ${LINES_PCT}%" >> coverage_report.txt
-            echo "   Statements: ${STATEMENTS_PCT}%" >> coverage_report.txt
-          else
-            echo "Status: ✅ PASSED" >> coverage_report.txt
-            echo "" >> coverage_report.txt
-            echo "✅ Coverage requirement met!" >> coverage_report.txt
-            echo "   Lines: ${LINES_PCT}% (≥75% required)" >> coverage_report.txt
-            echo "   Statements: ${STATEMENTS_PCT}% (≥75% required)" >> coverage_report.txt
-          fi
-          
-          echo "" >> coverage_report.txt
-          echo "Coverage Date: $(date)" >> coverage_report.txt
-          echo "" >> coverage_report.txt
-          echo "=====================================" >> coverage_report.txt
-          
-          # Still enforce the threshold
-          if [ "$LINES_FAIL" -eq 1 ] || [ "$STATEMENTS_FAIL" -eq 1 ]; then
-            echo ""
-            echo "❌ Coverage below 75% threshold"
-            echo "   Lines: ${LINES_PCT}%"
-            echo "   Statements: ${STATEMENTS_PCT}%"
-            exit 1
-          fi
-
-      - name: Upload Coverage Report (Text)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report-summary
-          path: backend/coverage_report.txt
-
-      - name: Upload Full Coverage Report (HTML)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report-html
-          path: backend/coverage
 
   # ---------------------------
   # 4️⃣ LINT STAGE
