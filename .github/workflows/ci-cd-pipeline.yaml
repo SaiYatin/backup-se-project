@@ -137,9 +137,9 @@ jobs:
           echo "  Failed: $FAILED_TESTS" >> test_report.txt
           echo "" >> test_report.txt
           echo "Test Types Executed:" >> test_report.txt
-          echo "  - Unit Tests: $UNIT_COUNT test files" >> test_report.txt
-          echo "  - Integration Tests: $INTEGRATION_COUNT test files" >> test_report.txt
-          echo "  - System Tests: $SYSTEM_COUNT test files" >> test_report.txt
+          echo "  - Unit Tests $UNIT_COUNT files" >> test_report.txt
+          echo "  - Integration Tests $INTEGRATION_COUNT files" >> test_report.txt
+          echo "  - System Tests $SYSTEM_COUNT files" >> test_report.txt
           echo "" >> test_report.txt
           echo "Note: Detailed coverage metrics are" >> test_report.txt
           echo "analyzed in the Coverage stage." >> test_report.txt
