@@ -345,14 +345,13 @@ jobs:
           ERRORS=$(grep -c "error" lint_output.txt || echo "0")
           WARNINGS=$(grep -c "warning" lint_output.txt || echo "0")
           
-          # Calculate lint score (out of 10)
+          # Calculate lint score (out of 10) using Python for reliable calculation
           # Formula: 10 - (errors * 0.5) - (warnings * 0.1)
-          # Max deduction: errors can reduce to 0, warnings have smaller impact
-          SCORE=$(echo "scale=2; s=10 - ($ERRORS * 0.5) - ($WARNINGS * 0.1); if (s < 0) 0 else if (s > 10) 10 else s" | bc)
+          SCORE=$(python3 -c "score = 10 - ($ERRORS * 0.5) - ($WARNINGS * 0.1); print(max(0, min(10, round(score, 2))))")
           
-          echo "LINT_SCORE=$SCORE" >> $GITHUB_OUTPUT
-          echo "ERRORS=$ERRORS" >> $GITHUB_OUTPUT
-          echo "WARNINGS=$WARNINGS" >> $GITHUB_OUTPUT
+          echo "LINT_SCORE=$SCORE" >> "$GITHUB_OUTPUT"
+          echo "ERRORS=$ERRORS" >> "$GITHUB_OUTPUT"
+          echo "WARNINGS=$WARNINGS" >> "$GITHUB_OUTPUT"
 
       - name: Generate Lint Report with Score
         run: |
@@ -379,13 +378,9 @@ jobs:
           echo "  Warnings: $WARNINGS" >> lint_report.txt
           echo "" >> lint_report.txt
           
-          # Add pass/fail status
-          THRESHOLD_CHECK=$(echo "$SCORE >= 7.5" | bc -l)
-          if [ "$THRESHOLD_CHECK" -eq 1 ]; then
-            echo "Result: PASSED (Score >= 7.5)" >> lint_report.txt
-          else
-            echo "Result: BELOW THRESHOLD (Score < 7.5)" >> lint_report.txt
-          fi
+          # Add pass/fail status using Python for reliable comparison
+          THRESHOLD_CHECK=$(python3 -c "print('PASSED' if float('$SCORE') >= 7.5 else 'BELOW THRESHOLD')")
+          echo "Result: $THRESHOLD_CHECK" >> lint_report.txt
           
           echo "" >> lint_report.txt
           echo "Detailed Results:" >> lint_report.txt
@@ -405,7 +400,8 @@ jobs:
           SCORE="${{ steps.eslint.outputs.LINT_SCORE }}"
           echo "Lint Score: $SCORE/10.0"
           
-          THRESHOLD_CHECK=$(echo "$SCORE >= 7.5" | bc -l)
+          # Use Python for reliable floating point comparison
+          THRESHOLD_CHECK=$(python3 -c "print(1 if float('$SCORE') >= 7.5 else 0)")
           if [ "$THRESHOLD_CHECK" -eq 0 ]; then
             echo "❌ Lint score $SCORE is below threshold 7.5"
             echo "   Errors: ${{ steps.eslint.outputs.ERRORS }}"
