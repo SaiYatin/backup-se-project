@@ -114,7 +114,7 @@ jobs:
       - name: Generate Test Report with Counts
         if: always()
         run: |
-          # Extract test counts from output
+          # Extract test counts from Jest output
           TOTAL_TESTS=$(grep -oP '\d+(?= total)' test_output.txt | head -1 || echo "0")
           PASSED_TESTS=$(grep -oP '\d+(?= passed)' test_output.txt | head -1 || echo "0")
           FAILED_TESTS=$(grep -oP '\d+(?= failed)' test_output.txt | head -1 || echo "0")
@@ -124,15 +124,20 @@ jobs:
           PASSED_TESTS=${PASSED_TESTS:-0}
           FAILED_TESTS=${FAILED_TESTS:-0}
           
-          # Count test files by type
-          UNIT_COUNT=$(find tests/unit -type f \( -name "*.test.js" -o -name "*.spec.js" \) 2>/dev/null | wc -l || echo "0")
-          INTEGRATION_COUNT=$(find tests/integration -type f \( -name "*.test.js" -o -name "*.spec.js" \) 2>/dev/null | wc -l || echo "0")
-          SYSTEM_COUNT=$(find tests/system -type f \( -name "*.test.js" -o -name "*.spec.js" \) 2>/dev/null | wc -l || echo "0")
+          # Count test files by type (your structure: tests/integration/, tests/system/, tests/unit/)
+          UNIT_COUNT=$(find tests/unit -type f -name "*.js" 2>/dev/null | wc -l)
+          INTEGRATION_COUNT=$(find tests/integration -type f -name "*.js" 2>/dev/null | wc -l)
+          SYSTEM_COUNT=$(find tests/system -type f -name "*.js" 2>/dev/null | wc -l)
           
           # Clean up whitespace
           UNIT_COUNT=$(echo "$UNIT_COUNT" | tr -d '[:space:]')
           INTEGRATION_COUNT=$(echo "$INTEGRATION_COUNT" | tr -d '[:space:]')
           SYSTEM_COUNT=$(echo "$SYSTEM_COUNT" | tr -d '[:space:]')
+          
+          # Fallback to 0 if empty
+          UNIT_COUNT=${UNIT_COUNT:-0}
+          INTEGRATION_COUNT=${INTEGRATION_COUNT:-0}
+          SYSTEM_COUNT=${SYSTEM_COUNT:-0}
           
           echo "=====================================" > test_report.txt
           echo "         TEST STAGE REPORT           " >> test_report.txt
