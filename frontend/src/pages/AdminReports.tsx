@@ -194,9 +194,9 @@ const AdminReports = () => {
       <div className="container mx-auto px-4">
         <div className="max-w-7xl mx-auto space-y-8">
           {/* Header */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold">Admin Reports & Analytics</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold">Admin Reports & Analytics</h1>
               <p className="text-muted-foreground mt-2">
                 Comprehensive platform insights and reporting dashboard
               </p>
@@ -211,7 +211,7 @@ const AdminReports = () => {
 
           {/* Overview Cards */}
           {overview && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
               <Card className="shadow-md hover:shadow-lg transition-all">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -273,7 +273,7 @@ const AdminReports = () => {
 
           {/* Additional Stats Row */}
           {overview && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">Average Pledge</CardTitle>

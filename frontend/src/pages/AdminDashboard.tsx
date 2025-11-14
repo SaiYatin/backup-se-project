@@ -388,7 +388,7 @@ const AdminDashboard = () => {
 
           {/* Stats Grid */}
           {stats && (
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
               <Card className="shadow-card hover:shadow-card-hover transition-all">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Events</CardTitle>
@@ -447,7 +447,7 @@ const AdminDashboard = () => {
 
           {/* Event Management Tabs */}
           <Tabs defaultValue="all" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3 max-w-2xl">
+            <TabsList className="grid w-full grid-cols-3 max-w-2xl mx-auto">
               <TabsTrigger value="all">
                 All Events ({allEvents.length})
               </TabsTrigger>
