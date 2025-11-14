@@ -194,7 +194,7 @@ if (newPledge) {
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-card rounded-lg overflow-hidden shadow-card">
-              <div className="h-96 bg-gradient-hero relative">
+              <div className="h-64 sm:h-80 md:h-96 bg-gradient-hero relative">
                 {event.image ? (
                   <img src={event.image} alt={event.title} className="w-full h-full object-cover" />
                 ) : (
@@ -212,13 +212,13 @@ if (newPledge) {
                 )}
               </div>
 
-              <div className="p-8 space-y-6">
+              <div className="p-4 sm:p-6 md:p-8 space-y-6">
                 <div>
-                  <h1 className="text-3xl md:text-4xl font-bold mb-4">{event.title}</h1>
+                  <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">{event.title}</h1>
 
                   {/* 🧑‍💼 Organizer controls */}
                   {user?.id === event.organizerId && (
-                    <div className="flex flex-wrap gap-3 mt-2">
+                    <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 mt-2">
                       <Button
                         variant="outline"
                         className="gap-2"
@@ -311,7 +311,7 @@ if (newPledge) {
           </div>
 
           <div className="space-y-6">
-            <div className="bg-card rounded-lg p-6 shadow-card sticky top-24">
+            <div className="bg-card rounded-lg p-4 sm:p-6 shadow-card lg:sticky lg:top-24">
               <ProgressChart
                 currentAmount={Number(event.currentAmount) || 0}
                 targetAmount={Number(event.targetAmount) || 0}

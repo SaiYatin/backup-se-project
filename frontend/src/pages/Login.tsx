@@ -58,7 +58,7 @@ const Login = () => {
               <Heart className="h-8 w-8 text-primary-foreground" fill="currentColor" />
             </div>
           </div>
-          <CardTitle className="text-2xl text-center">Welcome Back</CardTitle>
+          <CardTitle className="text-xl sm:text-2xl text-center">Welcome Back</CardTitle>
           <CardDescription className="text-center">
             Login to continue making a difference
           </CardDescription>

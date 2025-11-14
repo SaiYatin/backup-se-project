@@ -189,9 +189,9 @@ const OrganizerDashboard = () => {
       <div className="container mx-auto px-4">
         <div className="max-w-7xl mx-auto space-y-8">
           {/* Header */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-4xl font-bold mb-2">Organizer Dashboard</h1>
+              <h1 className="text-3xl sm:text-4xl font-bold mb-2">Organizer Dashboard</h1>
               <p className="text-lg text-muted-foreground">
                 Manage your fundraising events and track progress
               </p>
@@ -205,7 +205,7 @@ const OrganizerDashboard = () => {
           </div>
 
           {/* Stats Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             <Card className="shadow-md hover:shadow-lg transition-all">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Events</CardTitle>
