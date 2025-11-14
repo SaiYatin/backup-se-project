@@ -2,9 +2,9 @@ name: CI-CD Pipeline
 
 on:
   push:
-    branches: [ '**' ]
+    branches: ['**']
   pull_request:
-    branches: [ main, master, dev ]
+    branches: [main, master, dev]
 
 jobs:
   # ---------------------------
@@ -119,10 +119,20 @@ jobs:
           PASSED_TESTS=$(grep -oP '\d+(?= passed)' test_output.txt | head -1 || echo "0")
           FAILED_TESTS=$(grep -oP '\d+(?= failed)' test_output.txt | head -1 || echo "0")
           
+          # Ensure variables have values
+          TOTAL_TESTS=${TOTAL_TESTS:-0}
+          PASSED_TESTS=${PASSED_TESTS:-0}
+          FAILED_TESTS=${FAILED_TESTS:-0}
+          
           # Count test files by type
-          UNIT_COUNT=$(find tests/unit -name "*.test.js" -o -name "*.spec.js" 2>/dev/null | wc -l || echo "0")
-          INTEGRATION_COUNT=$(find tests/integration -name "*.test.js" -o -name "*.spec.js" 2>/dev/null | wc -l || echo "0")
-          SYSTEM_COUNT=$(find tests/system -name "*.test.js" -o -name "*.spec.js" 2>/dev/null | wc -l || echo "0")
+          UNIT_COUNT=$(find tests/unit -type f \( -name "*.test.js" -o -name "*.spec.js" \) 2>/dev/null | wc -l || echo "0")
+          INTEGRATION_COUNT=$(find tests/integration -type f \( -name "*.test.js" -o -name "*.spec.js" \) 2>/dev/null | wc -l || echo "0")
+          SYSTEM_COUNT=$(find tests/system -type f \( -name "*.test.js" -o -name "*.spec.js" \) 2>/dev/null | wc -l || echo "0")
+          
+          # Clean up whitespace
+          UNIT_COUNT=$(echo "$UNIT_COUNT" | tr -d '[:space:]')
+          INTEGRATION_COUNT=$(echo "$INTEGRATION_COUNT" | tr -d '[:space:]')
+          SYSTEM_COUNT=$(echo "$SYSTEM_COUNT" | tr -d '[:space:]')
           
           echo "=====================================" > test_report.txt
           echo "         TEST STAGE REPORT           " >> test_report.txt
@@ -210,11 +220,21 @@ jobs:
           FRONTEND_URL: http://localhost:5173
         run: npm test
 
+      - name: Check Coverage File Exists
+        if: always()
+        run: |
+          if [ ! -f coverage/coverage-summary.json ]; then
+            echo "❌ Coverage summary file not found!"
+            echo "Creating placeholder with 0% coverage..."
+            mkdir -p coverage
+            echo '{"total":{"lines":{"pct":0},"statements":{"pct":0}}}' > coverage/coverage-summary.json
+          fi
+
       - name: Generate Coverage Report (Lines & Statements Only)
         if: always()
         run: |
-          LINES_PCT=$(node -pe "require('./coverage/coverage-summary.json').total.lines.pct")
-          STATEMENTS_PCT=$(node -pe "require('./coverage/coverage-summary.json').total.statements.pct")
+          LINES_PCT=$(node -pe "require('./coverage/coverage-summary.json').total.lines.pct || 0")
+          STATEMENTS_PCT=$(node -pe "require('./coverage/coverage-summary.json').total.statements.pct || 0")
           
           echo "=====================================" > coverage_report.txt
           echo "      COVERAGE STAGE REPORT          " >> coverage_report.txt
@@ -228,9 +248,9 @@ jobs:
           echo "Threshold Required: >=75%" >> coverage_report.txt
           echo "" >> coverage_report.txt
           
-          # Check if coverage meets threshold
-          LINES_FAIL=$(echo "$LINES_PCT < 75" | bc -l)
-          STATEMENTS_FAIL=$(echo "$STATEMENTS_PCT < 75" | bc -l)
+          # Check if coverage meets threshold using awk (more reliable than bc)
+          LINES_FAIL=$(awk -v val="$LINES_PCT" 'BEGIN {print (val < 75) ? 1 : 0}')
+          STATEMENTS_FAIL=$(awk -v val="$STATEMENTS_PCT" 'BEGIN {print (val < 75) ? 1 : 0}')
           
           if [ "$LINES_FAIL" -eq 1 ] || [ "$STATEMENTS_FAIL" -eq 1 ]; then
             echo "Status: BELOW THRESHOLD" >> coverage_report.txt
@@ -251,10 +271,10 @@ jobs:
           echo "" >> coverage_report.txt
           echo "=====================================" >> coverage_report.txt
           
-          # Still enforce the threshold
+          # Enforce the threshold
           if [ "$LINES_FAIL" -eq 1 ] || [ "$STATEMENTS_FAIL" -eq 1 ]; then
             echo ""
-            echo "Coverage below 75% threshold"
+            echo "❌ Coverage below 75% threshold"
             echo "   Lines: ${LINES_PCT}%"
             echo "   Statements: ${STATEMENTS_PCT}%"
             exit 1
@@ -293,18 +313,30 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
 
       - name: Install Dependencies
         run: npm ci
 
-      - name: Create ESLint Config (if missing)
+      - name: Check for ESLint Config
+        id: check_eslint
         run: |
-          if [ ! -f eslint.config.js ] && [ ! -f .eslintrc.js ] && [ ! -f .eslintrc.json ]; then
-            echo "Creating basic eslint.config.js..."
-            cat > eslint.config.js << 'EOF'
+          if [ -f eslint.config.js ] || [ -f eslint.config.mjs ] || [ -f eslint.config.cjs ] || [ -f .eslintrc.js ] || [ -f .eslintrc.json ] || [ -f .eslintrc.yml ]; then
+            echo "config_exists=true" >> "$GITHUB_OUTPUT"
+            echo "✅ ESLint config found"
+          else
+            echo "config_exists=false" >> "$GITHUB_OUTPUT"
+            echo "⚠️  No ESLint config found, will create default"
+          fi
+
+      - name: Create Default ESLint Config (if missing)
+        if: steps.check_eslint.outputs.config_exists == 'false'
+        run: |
+          echo "Creating basic eslint.config.js..."
+          cat > eslint.config.js << 'EOF'
           export default [
             {
-              ignores: ['node_modules/**', 'coverage/**', 'dist/**', 'build/**']
+              ignores: ['node_modules/**', 'coverage/**', 'dist/**', 'build/**', 'tests/**']
             },
             {
               files: ['**/*.js'],
@@ -320,7 +352,10 @@ jobs:
                   setInterval: 'readonly',
                   setTimeout: 'readonly',
                   clearInterval: 'readonly',
-                  clearTimeout: 'readonly'
+                  clearTimeout: 'readonly',
+                  module: 'readonly',
+                  require: 'readonly',
+                  exports: 'readonly'
                 }
               },
               rules: {
@@ -328,12 +363,11 @@ jobs:
                 'no-undef': 'error',
                 'no-console': 'off',
                 'semi': ['warn', 'always'],
-                'quotes': ['warn', 'single']
+                'quotes': ['warn', 'single', { 'allowTemplateLiterals': true }]
               }
             }
           ];
           EOF
-          fi
 
       - name: Run ESLint with Score Calculation
         id: eslint
@@ -341,13 +375,28 @@ jobs:
           # Run ESLint and capture output
           npx eslint src --format stylish > lint_output.txt 2>&1 || true
           
-          # Count errors and warnings
-          ERRORS=$(grep -c "error" lint_output.txt || echo "0")
-          WARNINGS=$(grep -c "warning" lint_output.txt || echo "0")
+          # Count errors and warnings (handle case where grep finds nothing)
+          ERRORS=$(grep -o "error" lint_output.txt | wc -l || echo "0")
+          WARNINGS=$(grep -o "warning" lint_output.txt | wc -l || echo "0")
           
-          # Calculate lint score (out of 10) using Python for reliable calculation
+          # Clean up whitespace and ensure they're numbers
+          ERRORS=$(echo "$ERRORS" | tr -d '[:space:]')
+          WARNINGS=$(echo "$WARNINGS" | tr -d '[:space:]')
+          ERRORS=${ERRORS:-0}
+          WARNINGS=${WARNINGS:-0}
+          
+          echo "Found $ERRORS errors and $WARNINGS warnings"
+          
+          # Calculate lint score (out of 10) using awk
           # Formula: 10 - (errors * 0.5) - (warnings * 0.1)
-          SCORE=$(python3 -c "score = 10 - ($ERRORS * 0.5) - ($WARNINGS * 0.1); print(max(0, min(10, round(score, 2))))")
+          SCORE=$(awk -v e="$ERRORS" -v w="$WARNINGS" 'BEGIN {
+            score = 10 - (e * 0.5) - (w * 0.1);
+            if (score < 0) score = 0;
+            if (score > 10) score = 10;
+            printf "%.2f", score;
+          }')
+          
+          echo "Calculated score: $SCORE"
           
           echo "LINT_SCORE=$SCORE" >> "$GITHUB_OUTPUT"
           echo "ERRORS=$ERRORS" >> "$GITHUB_OUTPUT"
@@ -378,18 +427,19 @@ jobs:
           echo "  Warnings: $WARNINGS" >> lint_report.txt
           echo "" >> lint_report.txt
           
-          # Add pass/fail status using Python for reliable comparison
-          THRESHOLD_CHECK=$(python3 -c "print('PASSED' if float('$SCORE') >= 7.5 else 'BELOW THRESHOLD')")
+          # Add pass/fail status using awk
+          THRESHOLD_CHECK=$(awk -v score="$SCORE" 'BEGIN {print (score >= 7.5) ? "PASSED" : "BELOW THRESHOLD"}')
           echo "Result: $THRESHOLD_CHECK" >> lint_report.txt
           
           echo "" >> lint_report.txt
           echo "Detailed Results:" >> lint_report.txt
           echo "-----------------------------------" >> lint_report.txt
-          cat lint_output.txt >> lint_report.txt
+          cat lint_output.txt >> lint_report.txt || echo "No detailed output available" >> lint_report.txt
           echo "" >> lint_report.txt
           echo "=====================================" >> lint_report.txt
 
       - name: Upload Lint Report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lint-report
@@ -398,14 +448,19 @@ jobs:
       - name: Check Lint Score Threshold
         run: |
           SCORE="${{ steps.eslint.outputs.LINT_SCORE }}"
-          echo "Lint Score: $SCORE/10.0"
+          ERRORS="${{ steps.eslint.outputs.ERRORS }}"
+          WARNINGS="${{ steps.eslint.outputs.WARNINGS }}"
           
-          # Use Python for reliable floating point comparison
-          THRESHOLD_CHECK=$(python3 -c "print(1 if float('$SCORE') >= 7.5 else 0)")
+          echo "Lint Score: $SCORE/10.0"
+          echo "Errors: $ERRORS"
+          echo "Warnings: $WARNINGS"
+          
+          # Use awk for reliable floating point comparison
+          THRESHOLD_CHECK=$(awk -v score="$SCORE" 'BEGIN {print (score >= 7.5) ? 1 : 0}')
+          
           if [ "$THRESHOLD_CHECK" -eq 0 ]; then
             echo "❌ Lint score $SCORE is below threshold 7.5"
-            echo "   Errors: ${{ steps.eslint.outputs.ERRORS }}"
-            echo "   Warnings: ${{ steps.eslint.outputs.WARNINGS }}"
+            echo "   Fix errors and warnings to improve score"
             exit 1
           else
             echo "✅ Lint score $SCORE meets threshold (>= 7.5)"
@@ -435,17 +490,23 @@ jobs:
 
       - name: Run npm Audit (JSON Output Only)
         run: |
-          npm audit --json > security_report.json || true
+          echo "Running security scan..."
+          npm audit --json > security_report.json 2>&1 || true
+          
+          # Ensure file exists even if audit fails
+          if [ ! -f security_report.json ]; then
+            echo '{"metadata":{"vulnerabilities":{"critical":0,"high":0,"moderate":0,"low":0}}}' > security_report.json
+          fi
           
           # Display summary in console for visibility
           echo "======================================"
           echo "    SECURITY SCAN SUMMARY"
           echo "======================================"
           
-          HIGH=$(jq '.metadata.vulnerabilities.high' security_report.json || echo "0")
-          CRITICAL=$(jq '.metadata.vulnerabilities.critical' security_report.json || echo "0")
-          MODERATE=$(jq '.metadata.vulnerabilities.moderate' security_report.json || echo "0")
-          LOW=$(jq '.metadata.vulnerabilities.low' security_report.json || echo "0")
+          HIGH=$(jq -r '.metadata.vulnerabilities.high // 0' security_report.json)
+          CRITICAL=$(jq -r '.metadata.vulnerabilities.critical // 0' security_report.json)
+          MODERATE=$(jq -r '.metadata.vulnerabilities.moderate // 0' security_report.json)
+          LOW=$(jq -r '.metadata.vulnerabilities.low // 0' security_report.json)
           
           echo ""
           echo "Vulnerability Count:"
@@ -465,6 +526,7 @@ jobs:
           echo "======================================"
 
       - name: Upload Security Report (JSON Only)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: security-report
@@ -520,56 +582,83 @@ jobs:
           name: security-report
           path: backend/reports/
 
+      - name: Verify All Reports Downloaded
+        run: |
+          echo "Checking downloaded reports..."
+          ls -la reports/
+          
+          # Check required files
+          [ -f reports/build_report.txt ] && echo "✅ Build report found" || echo "❌ Build report missing"
+          [ -f reports/test_report.txt ] && echo "✅ Test report found" || echo "❌ Test report missing"
+          [ -f reports/coverage_report.txt ] && echo "✅ Coverage report found" || echo "❌ Coverage report missing"
+          [ -f reports/lint_report.txt ] && echo "✅ Lint report found" || echo "❌ Lint report missing"
+          [ -f reports/security_report.json ] && echo "✅ Security report found" || echo "❌ Security report missing"
+          [ -d reports/coverage-html ] && echo "✅ Coverage HTML found" || echo "❌ Coverage HTML missing"
+
       - name: Create Deployment Package
         run: |
           mkdir -p deployment-package
           
           # Copy source code
-          cp -r src package.json package-lock.json deployment-package/
+          if [ -d src ]; then
+            cp -r src deployment-package/
+            echo "✅ Source code copied"
+          else
+            echo "⚠️  Warning: src/ directory not found"
+          fi
+          
+          # Copy package files
+          [ -f package.json ] && cp package.json deployment-package/ && echo "✅ package.json copied"
+          [ -f package-lock.json ] && cp package-lock.json deployment-package/ && echo "✅ package-lock.json copied"
           
           # Copy README if exists
-          if [ -f README.md ]; then
-            cp README.md deployment-package/
-          fi
+          [ -f README.md ] && cp README.md deployment-package/ && echo "✅ README.md copied"
           
           # Copy all reports
           cp -r reports deployment-package/
+          echo "✅ All reports copied"
           
           # Create deployment info file
-          echo "=====================================" > deployment-package/DEPLOYMENT_INFO.txt
-          echo "   DEPLOYMENT PACKAGE INFORMATION    " >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "=====================================" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "Build Number: ${{ github.run_number }}" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "Build Date: $(date)" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "Commit SHA: ${{ github.sha }}" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "Branch: ${{ github.ref_name }}" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "Package Contents:" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  ✅ Source Code (src/)" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  ✅ Dependencies (package.json, package-lock.json)" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  ✅ Build Report (reports/build_report.txt)" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  ✅ Test Report (reports/test_report.txt)" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  ✅ Coverage Report - Text (reports/coverage_report.txt)" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  ✅ Coverage Report - HTML (reports/coverage-html/)" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  ✅ Lint Report (reports/lint_report.txt)" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  ✅ Security Report (reports/security_report.json)" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "Pipeline Stages Completed:" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  1. ✅ Build - Dependencies installed" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  2. ✅ Test - All tests passed" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  3. ✅ Coverage - >= 75% threshold met" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  4. ✅ Lint - Code quality >= 7.5/10" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "  5. ✅ Security - Vulnerability scan completed" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "All quality gates passed!" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "Package ready for deployment." >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "" >> deployment-package/DEPLOYMENT_INFO.txt
-          echo "=====================================" >> deployment-package/DEPLOYMENT_INFO.txt
+          cat > deployment-package/DEPLOYMENT_INFO.txt << EOF
+          =====================================
+             DEPLOYMENT PACKAGE INFORMATION    
+          =====================================
+          
+          Build Number: ${{ github.run_number }}
+          Build Date: $(date)
+          Commit SHA: ${{ github.sha }}
+          Branch: ${{ github.ref_name }}
+          
+          Package Contents:
+            ✅ Source Code (src/)
+            ✅ Dependencies (package.json, package-lock.json)
+            ✅ Build Report (reports/build_report.txt)
+            ✅ Test Report (reports/test_report.txt)
+            ✅ Coverage Report - Text (reports/coverage_report.txt)
+            ✅ Coverage Report - HTML (reports/coverage-html/)
+            ✅ Lint Report (reports/lint_report.txt)
+            ✅ Security Report (reports/security_report.json)
+          
+          Pipeline Stages Completed:
+            1. ✅ Build - Dependencies installed
+            2. ✅ Test - All tests passed
+            3. ✅ Coverage - >= 75% threshold met
+            4. ✅ Lint - Code quality >= 7.5/10
+            5. ✅ Security - Vulnerability scan completed
+          
+          All quality gates passed!
+          Package ready for deployment.
+          
+          =====================================
+          EOF
           
           # Create zip file
           cd deployment-package
           zip -r ../deployment-package-${{ github.run_number }}.zip .
+          cd ..
+          
+          echo "✅ Deployment package created successfully"
+          echo "Package size: $(du -h deployment-package-${{ github.run_number }}.zip | cut -f1)"
 
       - name: Upload Deployment Artifact
         uses: actions/upload-artifact@v4
@@ -580,36 +669,38 @@ jobs:
 
       - name: Generate Final Pipeline Summary
         run: |
-          echo "=====================================" > pipeline_summary.txt
-          echo "   CI/CD PIPELINE EXECUTION SUMMARY  " >> pipeline_summary.txt
-          echo "=====================================" >> pipeline_summary.txt
-          echo "" >> pipeline_summary.txt
-          echo "Pipeline Run #${{ github.run_number }}" >> pipeline_summary.txt
-          echo "Execution Date: $(date)" >> pipeline_summary.txt
-          echo "Branch: ${{ github.ref_name }}" >> pipeline_summary.txt
-          echo "Commit: ${{ github.sha }}" >> pipeline_summary.txt
-          echo "" >> pipeline_summary.txt
-          echo "Stage Results:" >> pipeline_summary.txt
-          echo "  1. Build       ✅ PASSED" >> pipeline_summary.txt
-          echo "  2. Test        ✅ PASSED" >> pipeline_summary.txt
-          echo "  3. Coverage    ✅ PASSED (>=75%)" >> pipeline_summary.txt
-          echo "  4. Lint        ✅ PASSED (>=7.5/10)" >> pipeline_summary.txt
-          echo "  5. Security    ✅ PASSED (scan completed)" >> pipeline_summary.txt
-          echo "  6. Deploy      ✅ ARTIFACT CREATED" >> pipeline_summary.txt
-          echo "" >> pipeline_summary.txt
-          echo "Deployment Package:" >> pipeline_summary.txt
-          echo "  Name: deployment-package-${{ github.run_number }}.zip" >> pipeline_summary.txt
-          echo "  Size: $(du -h deployment-package-${{ github.run_number }}.zip | cut -f1)" >> pipeline_summary.txt
-          echo "" >> pipeline_summary.txt
-          echo "Reports Included:" >> pipeline_summary.txt
-          echo "  - Build Report (TXT)" >> pipeline_summary.txt
-          echo "  - Test Report with counts (TXT)" >> pipeline_summary.txt
-          echo "  - Coverage Report (TXT + HTML)" >> pipeline_summary.txt
-          echo "  - Lint Report with score (TXT)" >> pipeline_summary.txt
-          echo "  - Security Report (JSON)" >> pipeline_summary.txt
-          echo "" >> pipeline_summary.txt
-          echo "All stages completed successfully!" >> pipeline_summary.txt
-          echo "=====================================" >> pipeline_summary.txt
+          cat > pipeline_summary.txt << EOF
+          =====================================
+             CI/CD PIPELINE EXECUTION SUMMARY  
+          =====================================
+          
+          Pipeline Run #${{ github.run_number }}
+          Execution Date: $(date)
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          
+          Stage Results:
+            1. Build       ✅ PASSED
+            2. Test        ✅ PASSED
+            3. Coverage    ✅ PASSED (>=75%)
+            4. Lint        ✅ PASSED (>=7.5/10)
+            5. Security    ✅ PASSED (scan completed)
+            6. Deploy      ✅ ARTIFACT CREATED
+          
+          Deployment Package:
+            Name: deployment-package-${{ github.run_number }}.zip
+            Size: $(du -h deployment-package-${{ github.run_number }}.zip | cut -f1 2>/dev/null || echo "N/A")
+          
+          Reports Included:
+            - Build Report (TXT)
+            - Test Report with counts (TXT)
+            - Coverage Report (TXT + HTML)
+            - Lint Report with score (TXT)
+            - Security Report (JSON)
+          
+          All stages completed successfully!
+          =====================================
+          EOF
 
       - name: Upload Pipeline Summary
         uses: actions/upload-artifact@v4
